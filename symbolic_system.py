@@ -43,17 +43,26 @@ class ContinuousDynamics:
             return sym.Evaluate(sym.Evaluate(self.f, env))
 
 class DTContinuousSystem:
-    def __init__(self, f, x, u, initial_env):
+    def __init__(self, f, x, u, initial_env=None):
         self.dynamics = ContinuousDynamics(f,x,u)
-        self.env = initial_env
+        if initial_env is None:
+            self.env = {}
+            for x_i in self.dynamics.x:
+                self.env[x_i] = 0
+        else:
+            self.env = initial_env
 
-    def foward_step(self, u, linearlize=False, modify_system=True, step_size = 1e-3, return_as_env = False):
+    def foward_step(self, u=None, linearlize=False, modify_system=True, step_size = 1e-3, return_as_env = False):
         if not modify_system:
             new_env = self.env.copy()
         else:
             new_env = self.env
-        for i, u_i in u:
-            new_env[self.dynamics.u[i]] = u[i]
+        if u is not None:
+            for i in range(u.shape[0]):
+                new_env[self.dynamics.u[i]] = u[i]
+        else:
+            for i in range(self.dynamics.u.shape[0]):
+                new_env[self.dynamics.u[i]] = 0
         delta_x = self.dynamics.evaluate_xdot(new_env, linearlize)*step_size
         #assign new xs
         for i in range(delta_x.shape[0]):
