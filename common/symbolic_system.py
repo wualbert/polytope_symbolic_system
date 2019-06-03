@@ -43,7 +43,7 @@ class ContinuousDynamics:
             return sym.Evaluate(sym.Evaluate(self.f, env))
 
 class DTContinuousSystem:
-    def __init__(self, f, x, u, initial_env=None):
+    def __init__(self, f, x, u, initial_env=None, input_limits = None):
         self.dynamics = ContinuousDynamics(f,x,u)
         if initial_env is None:
             self.env = {}
@@ -51,6 +51,10 @@ class DTContinuousSystem:
                 self.env[x_i] = 0
         else:
             self.env = initial_env
+        if input_limits is None:
+            self.input_limits = np.vstack([np.full(u.shape[0], -1e9),np.full(u.shape[0], 1e9)])
+        else:
+            self.input_limits = input_limits
 
     def foward_step(self, u=None, linearlize=False, modify_system=True, step_size = 1e-3, return_as_env = False):
         if not modify_system:
@@ -59,7 +63,7 @@ class DTContinuousSystem:
             new_env = self.env
         if u is not None:
             for i in range(u.shape[0]):
-                new_env[self.dynamics.u[i]] = u[i]
+                new_env[self.dynamics.u[i]] = min(max(u[i],self.input_limits[0,i]),self.input_limits[1,i])
         else:
             for i in range(self.dynamics.u.shape[0]):
                 new_env[self.dynamics.u[i]] = 0
@@ -72,3 +76,8 @@ class DTContinuousSystem:
         else:
             return extract_variable_value_from_env(self.dynamics.x, new_env)
 
+    def get_current_linearization(self):
+        return self.dynamics.construct_linearized_system_at(self.env)
+
+    def get_current_state(self):
+        return extract_variable_value_from_env(self.dynamics.x, self.env)
