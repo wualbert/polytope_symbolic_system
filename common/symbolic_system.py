@@ -1,5 +1,6 @@
 import pydrake.symbolic as sym
 import numpy as np
+from pypolycontain.lib.zonotope import *
 
 def extract_variable_value_from_env(symbolic_var, env):
     # symbolic_var is a vector
@@ -76,8 +77,34 @@ class DTContinuousSystem:
         else:
             return extract_variable_value_from_env(self.dynamics.x, new_env)
 
-    def get_current_linearization(self):
-        return self.dynamics.construct_linearized_system_at(self.env)
+    def get_reachable_zonotope(self, state, step_size = 1e-2):
+        current_linsys = self.get_linearization(state)
+        u_bar = (self.input_limits[1,:]+self.input_limits[0,:])/2
+        u_diff =(self.input_limits[1,:]-self.input_limits[0,:])/2
+        print(current_linsys.A, current_linsys.B, current_linsys.c)
+        x = np.dot(current_linsys.A*step_size+np.eye(current_linsys.A.shape[0]),state)+\
+            np.dot(current_linsys.B*step_size, u_bar)+current_linsys.c*step_size
+        G = np.atleast_2d(np.dot(current_linsys.B*step_size, np.diag(u_diff)))
+        print('x', x)
+        print('G', G)
+        return zonotope(x,G)
+
+
+    def get_linearization(self, state=None):
+        if state is None:
+            return self.dynamics.construct_linearized_system_at(self.env)
+        else:
+            env = self._state_to_env(state)
+            return self.dynamics.construct_linearized_system_at(env)
+
+    def _state_to_env(self, state):
+        env = {}
+        # print('state',state)
+        for i, s_i in enumerate(state):
+            env[self.dynamics.x[i]] = s_i
+        for u_i in self.dynamics.u:
+            env[u_i] = 0
+        return env
 
     def get_current_state(self):
         return extract_variable_value_from_env(self.dynamics.x, self.env)
