@@ -81,12 +81,14 @@ class DTContinuousSystem:
         current_linsys = self.get_linearization(state)
         u_bar = (self.input_limits[1,:]+self.input_limits[0,:])/2
         u_diff =(self.input_limits[1,:]-self.input_limits[0,:])/2
-        print(current_linsys.A, current_linsys.B, current_linsys.c)
-        x = np.dot(current_linsys.A*step_size+np.eye(current_linsys.A.shape[0]),state)+\
-            np.dot(current_linsys.B*step_size, u_bar)+current_linsys.c*step_size
+        # print(current_linsys.A, current_linsys.B, current_linsys.c)
+        x = np.ndarray.flatten(np.dot(current_linsys.A*step_size+np.eye(current_linsys.A.shape[0]),state))+\
+            np.dot(current_linsys.B*step_size, u_bar)+np.ndarray.flatten(current_linsys.c*step_size)
+        x = np.atleast_2d(x).reshape(-1,1)
+        assert(len(x)==len(state))
         G = np.atleast_2d(np.dot(current_linsys.B*step_size, np.diag(u_diff)))
-        print('x', x)
-        print('G', G)
+        # print('x', x)
+        # print('G', G)
         return zonotope(x,G)
 
 
