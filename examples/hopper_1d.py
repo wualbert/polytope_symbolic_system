@@ -64,4 +64,4 @@ class Hopper_1d(DTHybridSystem):
         self.c_list = np.asarray([free_flight_conditions, piston_contact_conditions, piston_retracted_conditions])
 
         DTHybridSystem.__init__(self, self.f_list, self.f_type_list, self.x, self.u, self.c_list, \
-                                self.initial_env, np.asarray([0, self.f_max]))
+                                self.initial_env, np.asarray([[0], [self.f_max]]))

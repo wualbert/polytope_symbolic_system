@@ -249,8 +249,6 @@ class DTHybridSystem:
                     break
             if not in_mode:
                 continue
-            if i == 2:
-                print('2')
             if self.dynamics_list[i].type == 'continuous':
                 delta_x = self.dynamics_list[i].evaluate_xdot(new_env, linearlize)*step_size
             elif self.dynamics_list[i].type == 'discrete':
