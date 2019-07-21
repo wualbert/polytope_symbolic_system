@@ -181,12 +181,12 @@ class DTContinuousSystem:
         return extract_variable_value_from_env(self.dynamics.x, self.env)
 
 class DTHybridSystem:
-    def __init__(self, f_list, x, u, c_list, initial_env=None, input_limits=None):
+    def __init__(self, f_list, f_type_list, x, u, c_list, initial_env=None, input_limits=None):
         '''
         Hybrid system with multiple dynamics modes
         :param f_list: numpy array of system dynamics modes
-        :param x:
-        :param u:
+        :param x: pydrake symbolic variables representing the states
+        :param u: pydrake symbolic variables representing the inputs
         :param c_list: numpy array of Pydrake symbolic expressions c_i(x,u) describing when the system belong in that mode.
                         c_i(x,u) is a vector of functions describing the mode. All of c_i(x,u) >= 0 when system is in mode i.
                         Modes should be complete and mutually exclusive.
@@ -195,10 +195,20 @@ class DTHybridSystem:
         '''
         assert f_list.shape[0] == c_list.shape[0]
         self.mode_count = f_list.shape[0]
-        self.dynamics_list = np.asarray([ContinuousDynamics(f,x,u) for f in f_list])
+        self.x = x
+        self.u = u
+        dynamics_list = []
+        for i, f in enumerate(f_list):
+            if f_type_list[i] == 'continuous':
+                dynamics_list.append(ContinuousDynamics(f,self.x,self.u))
+            elif f_type_list[i] == 'discrete':
+                dynamics_list.append(DiscreteDynamics(f, self.x, self.u))
+            else:
+                raise ValueError
+        self.dynamics_list = np.asarray(dynamics_list)
         if initial_env is None:
             self.env = {}
-            for x_i in self.dynamics_list.x:
+            for x_i in self.x:
                 self.env[x_i] = 0
         else:
             self.env = initial_env
@@ -219,10 +229,10 @@ class DTHybridSystem:
             new_env = self.env
         if u is not None:
             for i in range(u.shape[0]):
-                new_env[self.dynamics_list.u[i]] = min(max(u[i],self.input_limits[0,i]),self.input_limits[1,i])
+                new_env[self.u[i]] = min(max(u[i],self.input_limits[0,i]),self.input_limits[1,i])
         else:
-            for i in range(self.dynamics_list.u.shape[0]):
-                new_env[self.dynamics_list.u[i]] = 0
+            for i in range(self.u.shape[0]):
+                new_env[self.u[i]] = 0
 
         # Check for which mode the system is in
         delta_x = None
@@ -244,10 +254,10 @@ class DTHybridSystem:
         #assign new xs
         if self.dynamics_list[mode].type=='continuous':
             for i in range(delta_x.shape[0]):
-                new_env[self.dynamics_list[mode].x[i]] += delta_x[i]
+                new_env[self.x[i]] += delta_x[i]
         elif self.dynamics_list[mode].type=='discrete':
             for i in range(x_new.shape[0]):
-                new_env[self.dynamics_list[mode].x[i]] += x_new[i]
+                new_env[self.x[i]] += x_new[i]
         else:
             raise ValueError
 
@@ -257,12 +267,13 @@ class DTHybridSystem:
         elif return_as_env and return_mode:
             return new_env, mode
         elif not return_as_env and not return_mode:
-            return extract_variable_value_from_env(self.dynamics_list[mode].x, new_env)
+            return extract_variable_value_from_env(self.x, new_env)
         else:
-            return extract_variable_value_from_env(self.dynamics_list[mode].x, new_env), mode
+            return extract_variable_value_from_env(self.x, new_env), mode
 
     def get_reachable_zonotopes(self, state, step_size=1e-2):
         zonotopes_list = []
+        new_env = self.env.copy()
         for mode, c_i in enumerate(self.c_list):
             # FIXME: check if the mode is reachable
             current_linsys = self.get_linearization(mode, state)
@@ -306,10 +317,10 @@ class DTHybridSystem:
         env = {}
         # print('state',state)
         for i, s_i in enumerate(state):
-            env[self.dynamics_list[mode].x[i]] = s_i
+            env[self.x[i]] = s_i
         for u_i in self.dynamics_list[mode].u:
             env[u_i] = 0
         return env
 
     def get_current_state(self):
-        return extract_variable_value_from_env(self.dynamics_list[self.current_mode].x, self.env)
+        return extract_variable_value_from_env(self.x, self.env)
