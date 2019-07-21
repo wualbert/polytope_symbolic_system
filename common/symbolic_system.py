@@ -96,11 +96,14 @@ class DiscreteDynamics(Dynamics):
         self.c = -(np.dot(self.A, self.x)+np.dot(self.B, self.u))+self.f
 
     def construct_linearized_system_at(self, env):
-        self.A = sym.Jacobian(self.f, self.x)
-        self.B = sym.Jacobian(self.f, self.u)
-        self.c = -(np.dot(self.A, self.x)+np.dot(self.B, self.u))+self.f
+        return DiscreteLinearDynamics(sym.Evaluate(self.A, env), sym.Evaluate(self.B, env), sym.Evaluate(self.c, env))
 
-    def evaluate_x_next(self, env):
+    def evaluate_x_next(self, env, linearize=False):
+        if linearize:
+            linsys = self.construct_linearized_system_at(env)
+            x_env = extract_variable_value_from_env(self.x, env)
+            u_env = extract_variable_value_from_env(self.u, env)
+            return linsys.evaluate_x_next(x_env, u_env)
         return sym.Evaluate(self.f, env)
 
 
@@ -239,16 +242,26 @@ class DTHybridSystem:
         x_new = None
         mode = -1
         for i, c_i in enumerate(self.c_list):
-            if sym.Evaluate(c_i(new_env)).all() >= 0:
-                if self.dynamics_list[i].type == 'continuous':
-                    delta_x = self.dynamics_list[i].evaluate_xdot(new_env, linearlize)*step_size
-                elif self.dynamics_list[i].type == 'discrete':
-                    x_new = self.dynamics_list[i].evaluate_x_next(new_env, linearlize)
-                else:
-                    raise ValueError
-                mode = i
-                break
+            in_mode = True
+            for c_ij in c_i:
+                if c_ij.Evaluate(new_env) is False:
+                    in_mode = False
+                    break
+            if not in_mode:
+                continue
+            if i == 2:
+                print('2')
+            if self.dynamics_list[i].type == 'continuous':
+                delta_x = self.dynamics_list[i].evaluate_xdot(new_env, linearlize)*step_size
+            elif self.dynamics_list[i].type == 'discrete':
+                x_new = self.dynamics_list[i].evaluate_x_next(new_env, linearlize)
+            else:
+                raise ValueError
+            mode = i
+            break
         assert(mode != -1) # The system should always be in one mode
+        # print('mode', mode)
+        # print(self.env)
         #FIXME: check if system is in 2 modes (illegal)
 
         #assign new xs
@@ -257,7 +270,7 @@ class DTHybridSystem:
                 new_env[self.x[i]] += delta_x[i]
         elif self.dynamics_list[mode].type=='discrete':
             for i in range(x_new.shape[0]):
-                new_env[self.x[i]] += x_new[i]
+                new_env[self.x[i]] = x_new[i]
         else:
             raise ValueError
 

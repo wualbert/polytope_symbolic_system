@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 
 def test_static_pendulum():
     pend = Pendulum(initial_state = np.array([np.pi/2,0]), b=0.2)
-    #simulate the pendulum for 200 steps
+    #simulate the pendulum
     state_count = 4000
     states = np.zeros([2, state_count])
     states[:,0] = np.array([np.pi/2,0])

@@ -2,7 +2,7 @@ import pydrake.symbolic as sym
 from common.symbolic_system import *
 
 class Hopper_1d(DTHybridSystem):
-    def __init__(self, m, l, p, b, g, f_max, initial_state = None):
+    def __init__(self, m=1, l=1, p=0.1, b=0.8, g=1, f_max=2, initial_state = None, epsilon = 1e-7):
         '''
         Vertical 1D hopper with actuated piston at the end of the leg.
         The hopper has 3 dynamics mode decided by the body height h:
@@ -18,6 +18,7 @@ class Hopper_1d(DTHybridSystem):
         :param b: damping factor fo the ground
         :param g: gravity constant
         :param f_range: maximum force the piston can exert
+        :param epsilon: for maintaining stability near mode switches
         '''
         self.m = m
         self.l = l
@@ -25,8 +26,15 @@ class Hopper_1d(DTHybridSystem):
         self.b = b
         self.g = g
         self.f_max = f_max
+        self.epsilon = epsilon
         if initial_state is None:
             initial_state = np.asarray([self.l+self.p, 0])
+
+        # Symbolic variables
+        # x = [x, xdot], upward positive, floor is x<=0
+        self.x = np.array([sym.Variable('x_' + str(i)) for i in range(2)])
+        self.u = np.array([sym.Variable('u_' + str(i)) for i in range(1)])
+
         self.initial_env = {self.x[0]: initial_state[0], self.x[1]:initial_state[1]}
 
         # parameter sanity checks
@@ -38,10 +46,6 @@ class Hopper_1d(DTHybridSystem):
         assert(self.f_max >= 0)
         assert(self.l<self.initial_env[self.x[0]])
 
-        # Symbolic variables
-        # x = [x, xdot], upward positive, floor is x<=0
-        self.x = np.array([sym.Variable('x_' + str(i)) for i in range(2)])
-        self.u = np.array([sym.Variable('u_' + str(i)) for i in range(1)])
 
         # Dynamic modes
         # free flight
@@ -49,15 +53,14 @@ class Hopper_1d(DTHybridSystem):
         # piston contact
         piston_contact_dynamics = np.asarray([self.x[1], self.u[0]/self.m-self.g])
         # piston retract
-        piston_retracted_dynamics = np.asarray([0, abs(self.x[1])*self.b])
-        #abs() is a dirty trick for ensuring the hopper bounces up
+        piston_retracted_dynamics = np.asarray([self.l+self.epsilon, -self.x[1]*self.b])
         self.f_list = np.asarray([free_flight_dynamics, piston_contact_dynamics, piston_retracted_dynamics])
         self.f_type_list = np.asarray(['continuous', 'continuous', 'discrete'])
 
         # contact mode conditions
         free_flight_conditions = np.asarray([self.x[0]>self.l+self.p])
-        piston_contact_conditions = np.asarray([self.l<self.x[0]<self.l+self.p])
-        piston_retracted_conditions = np.asarray([self.x[0]<=0])
+        piston_contact_conditions = np.asarray([self.l<self.x[0], self.x[0]<=self.l+self.p])
+        piston_retracted_conditions = np.asarray([self.x[0]<=self.l])
         self.c_list = np.asarray([free_flight_conditions, piston_contact_conditions, piston_retracted_conditions])
 
         DTHybridSystem.__init__(self, self.f_list, self.f_type_list, self.x, self.u, self.c_list, \
