@@ -35,6 +35,9 @@ class ContinuousLinearDynamics(Dynamics):
 
 
 class ContinuousDynamics(Dynamics):
+    '''
+    System described by xdot(t) = f(x(t), u(t))
+    '''
     def __init__(self, f, x, u):
         Dynamics.__init__(self)
         self.f = f
@@ -76,6 +79,9 @@ class DiscreteLinearDynamics(Dynamics):
         return np.dot(self.A,x)+np.dot(self.B,u)+self.c
 
 class DiscreteDynamics(Dynamics):
+    '''
+    System described by x[t+1] = f(x[t], u[t])
+    '''
     def __init__(self, f, x, u):
         Dynamics.__init__(self)
         self.f = f
@@ -274,9 +280,8 @@ class DTHybridSystem:
                 # print('G', G)
 
             elif self.dynamics_list[mode].type == 'discrete':
-                # FIXME: is this correct?
                 x = np.ndarray.flatten(
-                    np.dot(current_linsys.A + np.eye(current_linsys.A.shape[0]), state)) + \
+                    np.dot(current_linsys.A, state)) + \
                     np.dot(current_linsys.B, u_bar) + np.ndarray.flatten(current_linsys.c)
                 x = np.atleast_2d(x).reshape(-1, 1)
                 assert (len(x) == len(state))
