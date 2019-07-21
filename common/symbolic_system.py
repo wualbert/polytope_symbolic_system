@@ -9,21 +9,38 @@ def extract_variable_value_from_env(symbolic_var, env):
         var_value[i] = env[symbolic_var[i]]
     return var_value
 
-class LinearDynamics:
+class Dynamics:
+    def __init__(self):
+        self.type='undefined'
+        pass
+
+    def construct_linearized_system_at(self, env):
+        raise NotImplementedError
+
+
+class ContinuousLinearDynamics(Dynamics):
     def __init__(self, A, B, c):
+        Dynamics.__init__(self)
         self.A = A
         self.B = B
         self.c = c
+        self.type='continuous'
+
+    def construct_linearized_system_at(self, env):
+        print('Warning: system is already linear!')
+        return self
 
     def evaluate_xdot(self, x, u):
         return np.dot(self.A,x)+np.dot(self.B,u)+self.c
 
-class ContinuousDynamics:
+
+class ContinuousDynamics(Dynamics):
     def __init__(self, f, x, u):
+        Dynamics.__init__(self)
         self.f = f
         self.x = x
         self.u = u
-        self.h = sym.Variable("h")
+        self.type='continuous'
         self._linearlize_system()
 
     def _linearlize_system(self):
@@ -32,7 +49,7 @@ class ContinuousDynamics:
         self.c = -(np.dot(self.A, self.x)+np.dot(self.B, self.u))+self.f
 
     def construct_linearized_system_at(self, env):
-        return LinearDynamics(sym.Evaluate(self.A, env), sym.Evaluate(self.B, env), sym.Evaluate(self.c, env))
+        return ContinuousLinearDynamics(sym.Evaluate(self.A, env), sym.Evaluate(self.B, env), sym.Evaluate(self.c, env))
 
     def evaluate_xdot(self, env, linearize=False):
         if linearize:
@@ -41,7 +58,45 @@ class ContinuousDynamics:
             u_env = extract_variable_value_from_env(self.u, env)
             return linsys.evaluate_xdot(x_env, u_env)
         else:
-            return sym.Evaluate(sym.Evaluate(self.f, env))
+            return sym.Evaluate(self.f, env)
+
+class DiscreteLinearDynamics(Dynamics):
+    def __init__(self, A, B, c):
+        Dynamics.__init__(self)
+        self.A = A
+        self.B = B
+        self.c = c
+        self.type='discrete'
+
+    def construct_linearized_system_at(self, env):
+        print('Warning: system is already linear!')
+        return self
+
+    def evaluate_x_next(self, x, u):
+        return np.dot(self.A,x)+np.dot(self.B,u)+self.c
+
+class DiscreteDynamics(Dynamics):
+    def __init__(self, f, x, u):
+        Dynamics.__init__(self)
+        self.f = f
+        self.x = x
+        self.u = u
+        self.type='discrete'
+        self._linearlize_system()
+
+    def _linearlize_system(self):
+        self.A = sym.Jacobian(self.f, self.x)
+        self.B = sym.Jacobian(self.f, self.u)
+        self.c = -(np.dot(self.A, self.x)+np.dot(self.B, self.u))+self.f
+
+    def construct_linearized_system_at(self, env):
+        self.A = sym.Jacobian(self.f, self.x)
+        self.B = sym.Jacobian(self.f, self.u)
+        self.c = -(np.dot(self.A, self.x)+np.dot(self.B, self.u))+self.f
+
+    def evaluate_x_next(self, env):
+        return sym.Evaluate(self.f, env)
+
 
 class DTContinuousSystem:
     def __init__(self, f, x, u, initial_env=None, input_limits = None):
@@ -137,7 +192,7 @@ class DTHybridSystem:
         self.dynamics_list = np.asarray([ContinuousDynamics(f,x,u) for f in f_list])
         if initial_env is None:
             self.env = {}
-            for x_i in self.dynamics.x:
+            for x_i in self.dynamics_list.x:
                 self.env[x_i] = 0
         else:
             self.env = initial_env
@@ -158,24 +213,39 @@ class DTHybridSystem:
             new_env = self.env
         if u is not None:
             for i in range(u.shape[0]):
-                new_env[self.dynamics.u[i]] = min(max(u[i],self.input_limits[0,i]),self.input_limits[1,i])
+                new_env[self.dynamics_list.u[i]] = min(max(u[i],self.input_limits[0,i]),self.input_limits[1,i])
         else:
-            for i in range(self.dynamics.u.shape[0]):
-                new_env[self.dynamics.u[i]] = 0
+            for i in range(self.dynamics_list.u.shape[0]):
+                new_env[self.dynamics_list.u[i]] = 0
+
         # Check for which mode the system is in
         delta_x = None
+        x_new = None
         mode = -1
         for i, c_i in enumerate(self.c_list):
             if sym.Evaluate(c_i(new_env)).all() >= 0:
-                delta_x = self.dynamics_list[i].evaluate_xdot(new_env, linearlize)*step_size
+                if self.dynamics_list[i].type == 'continuous':
+                    delta_x = self.dynamics_list[i].evaluate_xdot(new_env, linearlize)*step_size
+                elif self.dynamics_list[i].type == 'discrete':
+                    x_new = self.dynamics_list[i].evaluate_x_next(new_env, linearlize)
+                else:
+                    raise ValueError
                 mode = i
                 break
-        assert(delta_x is not None) # The system should always be in one mode
+        assert(mode != -1) # The system should always be in one mode
         #FIXME: check if system is in 2 modes (illegal)
 
         #assign new xs
-        for i in range(delta_x.shape[0]):
-            new_env[self.dynamics_list[mode].x[i]] += delta_x[i]
+        if self.dynamics_list[mode].type=='continuous':
+            for i in range(delta_x.shape[0]):
+                new_env[self.dynamics_list[mode].x[i]] += delta_x[i]
+        elif self.dynamics_list[mode].type=='discrete':
+            for i in range(x_new.shape[0]):
+                new_env[self.dynamics_list[mode].x[i]] += x_new[i]
+        else:
+            raise ValueError
+
+        #return options
         if return_as_env and not return_mode:
             return new_env
         elif return_as_env and return_mode:
@@ -193,14 +263,29 @@ class DTHybridSystem:
             u_bar = (self.input_limits[1, :] + self.input_limits[0, :]) / 2
             u_diff = (self.input_limits[1, :] - self.input_limits[0, :]) / 2
             # print(current_linsys.A, current_linsys.B, current_linsys.c)
-            x = np.ndarray.flatten(
-                np.dot(current_linsys.A * step_size + np.eye(current_linsys.A.shape[0]), state)) + \
-                np.dot(current_linsys.B * step_size, u_bar) + np.ndarray.flatten(current_linsys.c * step_size)
-            x = np.atleast_2d(x).reshape(-1, 1)
-            assert (len(x) == len(state))
-            G = np.atleast_2d(np.dot(current_linsys.B * step_size, np.diag(u_diff)))
-            # print('x', x)
-            # print('G', G)
+            if self.dynamics_list[mode].type == 'continuous':
+                x = np.ndarray.flatten(
+                    np.dot(current_linsys.A * step_size + np.eye(current_linsys.A.shape[0]), state)) + \
+                    np.dot(current_linsys.B * step_size, u_bar) + np.ndarray.flatten(current_linsys.c * step_size)
+                x = np.atleast_2d(x).reshape(-1, 1)
+                assert (len(x) == len(state))
+                G = np.atleast_2d(np.dot(current_linsys.B * step_size, np.diag(u_diff)))
+                # print('x', x)
+                # print('G', G)
+
+            elif self.dynamics_list[mode].type == 'discrete':
+                # FIXME: is this correct?
+                x = np.ndarray.flatten(
+                    np.dot(current_linsys.A + np.eye(current_linsys.A.shape[0]), state)) + \
+                    np.dot(current_linsys.B, u_bar) + np.ndarray.flatten(current_linsys.c)
+                x = np.atleast_2d(x).reshape(-1, 1)
+                assert (len(x) == len(state))
+                G = np.atleast_2d(np.dot(current_linsys.B, np.diag(u_diff)))
+                # print('x', x)
+                # print('G', G)
+            else:
+                raise ValueError
+
             zonotopes_list.append(zonotope(x,G))
 
         return np.asarray(zonotopes_list)
