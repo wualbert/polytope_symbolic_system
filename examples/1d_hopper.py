@@ -2,7 +2,7 @@ import pydrake.symbolic as sym
 from common.symbolic_system import *
 
 class Hopper_1d(DTHybridSystem):
-    def __init__(self, m, l, p, b, g, f_range, initial_state = None):
+    def __init__(self, m, l, p, b, g, f_max, initial_state = None):
         '''
         Vertical 1D hopper with actuated piston at the end of the leg.
         The hopper has 3 dynamics mode decided by the body height h:
@@ -24,15 +24,41 @@ class Hopper_1d(DTHybridSystem):
         self.p = p
         self.b = b
         self.g = g
-        self.f_range = f_range
+        self.f_max = f_max
         if initial_state is None:
-            self.initial_state = np.asarray([self.l+self.p, 0])
-        else:
-            self.initial_state = self.initial_state
+            initial_state = np.asarray([self.l+self.p, 0])
+        self.initial_env = {self.x[0]: initial_state[0], self.x[1]:initial_state[1]}
+
+        # parameter sanity checks
+        assert(self.m>0)
+        assert(self.l>0)
+        assert(self.p>0)
+        assert(self.g>0)
+        assert(0<self.b<1)
+        assert(self.f_max >= 0)
+        assert(self.l<self.initial_env[self.x[0]])
+
         # Symbolic variables
+        # x = [x, xdot], upward positive, floor is x<=0
         self.x = np.array([sym.Variable('x_' + str(i)) for i in range(2)])
         self.u = np.array([sym.Variable('u_' + str(i)) for i in range(1)])
 
         # Dynamic modes
+        # free flight
+        free_flight_dynamics = np.asarray([self.x[1], -self.g])
+        # piston contact
+        piston_contact_dynamics = np.asarray([self.x[1], self.u[0]/self.m-self.g])
+        # piston retract
+        piston_retracted_dynamics = np.asarray([0, abs(self.x[1])*self.b])
+        #abs() is a dirty trick for ensuring the hopper bounces up
+        self.f_list = np.asarray([free_flight_dynamics, piston_contact_dynamics, piston_retracted_dynamics])
+        self.f_type_list = np.asarray(['continuous', 'continuous', 'discrete'])
 
-        DTHybridSystem.__init__()
+        # contact mode conditions
+        free_flight_conditions = np.asarray([self.x[0]>self.l+self.p])
+        piston_contact_conditions = np.asarray([self.l<self.x[0]<self.l+self.p])
+        piston_retracted_conditions = np.asarray([self.x[0]<=0])
+        self.c_list = np.asarray([free_flight_conditions, piston_contact_conditions, piston_retracted_conditions])
+
+        DTHybridSystem.__init__(self, self.f_list, self.f_type_list, self.x, self.u, self.c_list, \
+                                self.initial_env, np.asarray([0, self.f_max]))
