@@ -106,7 +106,6 @@ class DiscreteDynamics(Dynamics):
             return linsys.evaluate_x_next(x_env, u_env)
         return sym.Evaluate(self.f, env)
 
-
 class DTContinuousSystem:
     def __init__(self, f, x, u, initial_env=None, input_limits = None):
         '''
@@ -129,7 +128,7 @@ class DTContinuousSystem:
         else:
             self.input_limits = input_limits
 
-    def foward_step(self, u=None, linearlize=False, modify_system=True, step_size = 1e-3, return_as_env = False):
+    def forward_step(self, u=None, linearlize=False, modify_system=True, step_size = 1e-3, return_as_env = False):
         if not modify_system:
             new_env = self.env.copy()
         else:
@@ -149,7 +148,7 @@ class DTContinuousSystem:
         else:
             return extract_variable_value_from_env(self.dynamics.x, new_env)
 
-    def get_reachable_zonotope(self, state, step_size = 1e-2):
+    def get_reachable_zonotopes(self, state, step_size = 1e-2):
         current_linsys = self.get_linearization(state)
         u_bar = (self.input_limits[1,:]+self.input_limits[0,:])/2
         u_diff =(self.input_limits[1,:]-self.input_limits[0,:])/2
@@ -171,17 +170,27 @@ class DTContinuousSystem:
             env = self._state_to_env(state)
             return self.dynamics.construct_linearized_system_at(env)
 
-    def _state_to_env(self, state):
+    def _state_to_env(self, state, u=None):
         env = {}
         # print('state',state)
         for i, s_i in enumerate(state):
             env[self.dynamics.x[i]] = s_i
-        for u_i in self.dynamics.u:
-            env[u_i] = 0
+        if u is None:
+            for u_i in self.dynamics.u:
+                env[u_i] = 0
+        else:
+            for i, u_i in enumerate(u):
+                env[self.dynamics.u[i]] = u[i]
         return env
 
     def get_current_state(self):
         return extract_variable_value_from_env(self.dynamics.x, self.env)
+
+def in_mode(c_i, env):
+    for c_ij in c_i:
+        if c_ij.Evaluate(env) is False:
+            return False
+    return True
 
 class DTHybridSystem:
     def __init__(self, f_list, f_type_list, x, u, c_list, initial_env=None, input_limits=None):
@@ -224,9 +233,11 @@ class DTHybridSystem:
         self.current_mode = -1
         #TODO
 
-    def foward_step(self, u=None, linearlize=False, modify_system=True, step_size = 1e-3, return_as_env = False,
-                    return_mode = False):
-        if not modify_system:
+    def forward_step(self, u=None, linearlize=False, modify_system=True, step_size = 1e-3, return_as_env = False,
+                     return_mode = False, starting_state=None):
+        if starting_state is not None:
+            new_env = self._state_to_env(starting_state, u)
+        elif not modify_system:
             new_env = self.env.copy()
         else:
             new_env = self.env
@@ -236,18 +247,13 @@ class DTHybridSystem:
         else:
             for i in range(self.u.shape[0]):
                 new_env[self.u[i]] = 0
-
         # Check for which mode the system is in
         delta_x = None
         x_new = None
         mode = -1
         for i, c_i in enumerate(self.c_list):
-            in_mode = True
-            for c_ij in c_i:
-                if c_ij.Evaluate(new_env) is False:
-                    in_mode = False
-                    break
-            if not in_mode:
+            is_in_mode = in_mode(c_i,new_env)
+            if not is_in_mode:
                 continue
             if self.dynamics_list[i].type == 'continuous':
                 delta_x = self.dynamics_list[i].evaluate_xdot(new_env, linearlize)*step_size
@@ -284,10 +290,25 @@ class DTHybridSystem:
 
     def get_reachable_zonotopes(self, state, step_size=1e-2):
         zonotopes_list = []
-        new_env = self.env.copy()
         for mode, c_i in enumerate(self.c_list):
-            # FIXME: check if the mode is reachable
-            current_linsys = self.get_linearization(mode, state)
+            # FIXME: better way to check if the mode is possible
+            # Very naive check: if all-min and all-max input lead to not being in mode, assume state is not in mode
+            lower_bound_env = self.env.copy()
+            upper_bound_env = self.env.copy()
+            unactuated_env = self.env.copy()
+            for i, u_i in enumerate(self.u):
+                lower_bound_env[u_i] = self.input_limits[0,i]
+                upper_bound_env[u_i] = self.input_limits[1, i]
+                unactuated_env[u_i] = 0
+            for i, x_i in enumerate(self.x):
+                lower_bound_env[x_i] = state[i]
+                upper_bound_env[x_i] = state[i]
+                unactuated_env[x_i] = state[i]
+
+            if (not in_mode(c_i, lower_bound_env)) and (not in_mode(c_i, upper_bound_env)) and not in_mode(c_i, unactuated_env):
+                continue
+
+            current_linsys = self.get_linearization(state, mode)
             u_bar = (self.input_limits[1, :] + self.input_limits[0, :]) / 2
             u_diff = (self.input_limits[1, :] - self.input_limits[0, :]) / 2
             # print(current_linsys.A, current_linsys.B, current_linsys.c)
@@ -314,23 +335,33 @@ class DTHybridSystem:
                 raise ValueError
 
             zonotopes_list.append(zonotope(x,G))
-
         return np.asarray(zonotopes_list)
 
-    def get_linearization(self, mode, state=None):
+    def get_linearization(self, state=None, mode=None):
         if state is None:
-            return self.dynamics_list[mode].construct_linearized_system_at(self.env)
+            return self.dynamics_list[self.current_mode].construct_linearized_system_at(self.env)
         else:
-            env = self._state_to_env(mode, state)
-            return self.dynamics_list[mode].construct_linearized_system_at(env)
+            env = self._state_to_env(state)
+            if mode is not None:
+                assert in_mode(self.c_list[mode], env)
+                return self.dynamics_list[mode].construct_linearized_system_at(env)
+            for mode, c_i in enumerate(self.c_list):
+                if in_mode(c_i, env):
+                    return self.dynamics_list[mode].construct_linearized_system_at(env)
+            print('Warning: state is not in any mode')
+            return None
 
-    def _state_to_env(self, mode, state):
+    def _state_to_env(self, state, u=None):
         env = {}
         # print('state',state)
         for i, s_i in enumerate(state):
             env[self.x[i]] = s_i
-        for u_i in self.dynamics_list[mode].u:
-            env[u_i] = 0
+        if u is None:
+            for u_i in self.u:
+                env[u_i] = 0
+        else:
+            for i, u_i in enumerate(u):
+                env[self.u[i]] = u[i]
         return env
 
     def get_current_state(self):

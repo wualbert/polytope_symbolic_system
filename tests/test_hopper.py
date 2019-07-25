@@ -9,7 +9,7 @@ def test_static_hopper():
     states = np.zeros([2, state_count])
     states[:,0] = initial_state
     for i in range(state_count):
-        states[:,i] = hopper.foward_step(step_size=1e-3)
+        states[:,i] = hopper.forward_step(step_size=1e-3)
     plt.subplot(211)
     plt.plot(states[0,:])
     plt.xlabel('Steps')
@@ -30,7 +30,7 @@ def test_constant_input_hopper():
     states[:, 0] = initial_state
     for i in range(state_count):
         u = f_max
-        states[:, i] = hopper.foward_step(step_size=1e-3,u=np.asarray([u]))
+        states[:, i] = hopper.forward_step(step_size=1e-3, u=np.asarray([u]))
     plt.subplot(211)
     plt.plot(states[0, :])
     plt.xlabel('Steps')
