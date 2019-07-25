@@ -16,8 +16,8 @@ def test_with_toy_system():
     print('linearized x_dot:', dyn.evaluate_xdot(env, linearize=True))
 
     sys = DTContinuousSystem(f, x, u, initial_env={x[0]:4, u[0]:0})
-    print('Nonlinear forward step:', sys.foward_step(u=np.array([2]),step_size=1, modify_system=False))
-    print('Linear forward step:', sys.foward_step(u=np.array([2]),linearlize=True, step_size = 1,modify_system=False))
-    print(sys.get_reachable_zonotope([0.5]))
+    print('Nonlinear forward step:', sys.forward_step(u=np.array([2]), step_size=1, modify_system=False))
+    print('Linear forward step:', sys.forward_step(u=np.array([2]), linearlize=True, step_size = 1, modify_system=False))
+    print(sys.get_reachable_zonotopes([0.5]))
 if __name__ == '__main__':
     test_with_toy_system()

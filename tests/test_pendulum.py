@@ -3,12 +3,12 @@ import matplotlib.pyplot as plt
 
 def test_static_pendulum():
     pend = Pendulum(initial_state = np.array([np.pi/2,0]), b=0.2)
-    #simulate the pendulum for 200 steps
+    #simulate the pendulum
     state_count = 4000
     states = np.zeros([2, state_count])
     states[:,0] = np.array([np.pi/2,0])
     for i in range(state_count):
-        states[:,i] = pend.foward_step(step_size=1e-2)
+        states[:,i] = pend.forward_step(step_size=1e-2)
     plt.subplot(211)
     plt.plot(states[0,:])
     plt.xlabel('Steps')
@@ -29,7 +29,7 @@ def test_controlled_pendulum():
     for i in range(state_count):
         current_state = pend.get_current_state()
         u = 10*(current_state[0]-np.pi)+1*(current_state[1])
-        states[:,i] = pend.foward_step(step_size=1e-2, u=np.asarray([-u]))
+        states[:,i] = pend.forward_step(step_size=1e-2, u=np.asarray([-u]))
     plt.subplot(211)
     plt.plot(states[0,:])
     plt.xlabel('Steps')
