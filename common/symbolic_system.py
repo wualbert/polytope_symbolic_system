@@ -1,6 +1,7 @@
 import pydrake.symbolic as sym
 import numpy as np
 from pypolycontain.lib.zonotope import *
+from pypolycontain.lib.operations import convex_hull_of_point_and_polytope
 
 def extract_variable_value_from_env(symbolic_var, env):
     # symbolic_var is a vector
@@ -148,7 +149,7 @@ class DTContinuousSystem:
         else:
             return extract_variable_value_from_env(self.dynamics.x, new_env)
 
-    def get_reachable_zonotopes(self, state, step_size = 1e-2):
+    def get_reachable_polytopes(self, state, step_size = 1e-2, use_convex_hull=True):
         current_linsys = self.get_linearization(state)
         u_bar = (self.input_limits[1,:]+self.input_limits[0,:])/2
         u_diff =(self.input_limits[1,:]-self.input_limits[0,:])/2
@@ -158,8 +159,8 @@ class DTContinuousSystem:
         x = np.atleast_2d(x).reshape(-1,1)
         assert(len(x)==len(state))
         G = np.atleast_2d(np.dot(current_linsys.B*step_size, np.diag(u_diff)))
-        # print('x', x)
-        # print('G', G)
+        if use_convex_hull:
+            return convex_hull_of_point_and_polytope(x,zonotope(x,G))
         return zonotope(x,G)
 
 
@@ -288,8 +289,8 @@ class DTHybridSystem:
         else:
             return extract_variable_value_from_env(self.x, new_env), mode
 
-    def get_reachable_zonotopes(self, state, step_size=1e-2):
-        zonotopes_list = []
+    def get_reachable_polytopes(self, state, step_size=1e-2, use_convex_hull=True):
+        polytopes_list = []
         for mode, c_i in enumerate(self.c_list):
             # FIXME: better way to check if the mode is possible
             # Very naive check: if all-min and all-max input lead to not being in mode, assume state is not in mode
@@ -333,9 +334,11 @@ class DTHybridSystem:
                 # print('G', G)
             else:
                 raise ValueError
-
-            zonotopes_list.append(zonotope(x,G))
-        return np.asarray(zonotopes_list)
+            if use_convex_hull:
+                polytopes_list.append(convex_hull_of_point_and_polytope(x, zonotope(x,G)))
+            else:
+                polytopes_list.append(zonotope(x, G))
+        return np.asarray(polytopes_list)
 
     def get_linearization(self, state=None, mode=None):
         if state is None:
