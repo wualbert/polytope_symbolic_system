@@ -79,33 +79,161 @@ class Hopper_2d(DTHybridSystem):
         flight_extended_conditions = np.asarray([self.k0-self.x[4]+self.u[1]>0,
                                                       self.x[3]-self.ground_height_function(self.x[2])>0])
 
+        A_flight_extended = W*self.M2*(self.x[5]**2*W*sym.sin(self.x[0])-2*self.x[5]*self.x[9]*sym.cos(self.x[0])+\
+            self.r2*self.x[6]**2*sym.sin(self.x[1])+self.r1*self.x[5]**2*sym.sin(self.x[0]))-\
+            self.r1*FX_flight*(sym.cos(self.x[0])**2)+sym.cos(self.x[0])*(self.r1*FY_flight*sym.sin(self.x[0])-self.u[0])+\
+            FK_extended*W*sym.sin(self.x[0])
+
+        B_flight_extended = W*self.M2*(self.x[5]**2*W*sym.cos(self.x[0])+2*self.x[5]*self.x[9]*sym.sin(self.x[0])+\
+                                       self.r2*self.x[6]**2*sym.cos(self.x[1])+self.r1*self.x[5]**2*sym.cos(self.x[0])-g)+\
+            self.r1*FX_flight*sym.cos(self.x[0])*sym.sin(self.x[0])-sym.sin(self.x[0])*(self.r1*FY_flight*sym.sin(self.x[0])-self.u[0])+\
+            FK_extended*W*sym.cos(self.x[0])
+
+        C_flight_extended = W*(self.M1*self.r1*self.x[5]**2*sym.sin(self.x[0])-FK_extended*sym.sin(self.x[0])+FX_flight)-\
+            sym.cos(self.x[0])*(FY_flight*self.r1*sym.sin(self.x[0])-FX_flight*self.r1*sym.cos(self.x[0])-self.u[0])
+
+        D_flight_extended = W*(self.M1*self.r1*self.x[5]**2*sym.cos(self.x[0])-FK_extended*sym.cos(self.x[0])+FY_flight-self.M1*self.g)-\
+            sym.sin(self.x[0])*(FY_flight*self.r1*sym.sin(self.x[0])-FX_flight*self.r1*sym.cos(self.x[0])-self.u[0])
+
+        E_flight_extended = W*(FK_extended*self.r2*sym.sin(self.x[1]-self.x[0])+self.u[0])-self.r2*sym.cos(self.x[1]-self.x[0])*\
+                            (self.r1*FY_flight*sym.sin(self.x[0])-self.r1*FX_flight*sym.cos(self.x[0])-self.u[0])
+
+        theta1_ddot_flight_extended = (a4*b2/b4-a2)*E_flight_extended/e2-a3*C_flight_extended/c2+a4*b3*D_flight_extended/(b4*d2)+\
+                                      A_flight_extended-a4*B_flight_extended/b4
+
+        theta2_ddot_flight_extended = E_flight_extended/e2-e1/e2*theta1_ddot_flight_extended
+
+        x_ddot_flight_extended = (C_flight_extended-c1*theta1_ddot_flight_extended)/c2
+
+        y_ddot_flight_extended = (D_flight_extended-d1*theta1_ddot_flight_extended)/c2
+
+        w_ddot_flight_extended = (A_flight_extended-a1*theta1_ddot_flight_extended-a2*theta2_ddot_flight_extended-a3*x_ddot_flight_extended)/a4
+
+        flight_extended_ddots = np.asarray([theta1_ddot_flight_extended, theta2_ddot_flight_extended, x_ddot_flight_extended, y_ddot_flight_extended, w_ddot_flight_extended])
+
+        flight_extended_dynamics = np.hstack((self.x[5:], flight_extended_ddots))
+
         # free flight with retracted leg
         flight_retracted_conditions = np.asarray([self.k0-self.x[4]+self.u[1]<=0,
                                                       self.x[3]-self.ground_height_function(self.x[2])>0])
+        A_flight_retracted = W*self.M2*(self.x[5]**2*W*sym.sin(self.x[0])-2*self.x[5]*self.x[9]*sym.cos(self.x[0])+\
+            self.r2*self.x[6]**2*sym.sin(self.x[1])+self.r1*self.x[5]**2*sym.sin(self.x[0]))-\
+            self.r1*FX_flight*(sym.cos(self.x[0])**2)+sym.cos(self.x[0])*(self.r1*FY_flight*sym.sin(self.x[0])-self.u[0])+\
+            FK_retracted*W*sym.sin(self.x[0])
+
+        B_flight_retracted = W*self.M2*(self.x[5]**2*W*sym.cos(self.x[0])+2*self.x[5]*self.x[9]*sym.sin(self.x[0])+\
+                                       self.r2*self.x[6]**2*sym.cos(self.x[1])+self.r1*self.x[5]**2*sym.cos(self.x[0])-g)+\
+            self.r1*FX_flight*sym.cos(self.x[0])*sym.sin(self.x[0])-sym.sin(self.x[0])*(self.r1*FY_flight*sym.sin(self.x[0])-self.u[0])+\
+            FK_retracted*W*sym.cos(self.x[0])
+
+        C_flight_retracted = W*(self.M1*self.r1*self.x[5]**2*sym.sin(self.x[0])-FK_retracted*sym.sin(self.x[0])+FX_flight)-\
+            sym.cos(self.x[0])*(FY_flight*self.r1*sym.sin(self.x[0])-FX_flight*self.r1*sym.cos(self.x[0])-self.u[0])
+
+        D_flight_retracted = W*(self.M1*self.r1*self.x[5]**2*sym.cos(self.x[0])-FK_retracted*sym.cos(self.x[0])+FY_flight-self.M1*self.g)-\
+            sym.sin(self.x[0])*(FY_flight*self.r1*sym.sin(self.x[0])-FX_flight*self.r1*sym.cos(self.x[0])-self.u[0])
+
+        E_flight_retracted = W*(FK_retracted*self.r2*sym.sin(self.x[1]-self.x[0])+self.u[0])-self.r2*sym.cos(self.x[1]-self.x[0])*\
+                            (self.r1*FY_flight*sym.sin(self.x[0])-self.r1*FX_flight*sym.cos(self.x[0])-self.u[0])
+
+        theta1_ddot_flight_retracted = (a4*b2/b4-a2)*E_flight_retracted/e2-a3*C_flight_retracted/c2+a4*b3*D_flight_retracted/(b4*d2)+\
+                                      A_flight_retracted-a4*B_flight_retracted/b4
+
+        theta2_ddot_flight_retracted = E_flight_retracted/e2-e1/e2*theta1_ddot_flight_retracted
+
+        x_ddot_flight_retracted = (C_flight_retracted-c1*theta1_ddot_flight_retracted)/c2
+
+        y_ddot_flight_retracted = (D_flight_retracted-d1*theta1_ddot_flight_retracted)/c2
+
+        w_ddot_flight_retracted = (A_flight_retracted-a1*theta1_ddot_flight_retracted-a2*theta2_ddot_flight_retracted-a3*x_ddot_flight_retracted)/a4
+
+        flight_retracted_ddots = np.asarray([theta1_ddot_flight_retracted, theta2_ddot_flight_retracted, x_ddot_flight_retracted, y_ddot_flight_retracted, w_ddot_flight_retracted])
+
+        flight_retracted_dynamics = np.hstack((self.x[5:], flight_retracted_ddots))
+
 
         # contact with extended leg
         contact_extended_conditions = np.asarray([self.k0-self.x[4]+self.u[1]>0,
                                                       self.x[3]-self.ground_height_function(self.x[2])<=0])
 
+        contact_extended_conditions = np.asarray([self.k0-self.x[4]+self.u[1]>0,
+                                                      self.x[3]-self.ground_height_function(self.x[2])>0])
+
+        A_contact_extended = W*self.M2*(self.x[5]**2*W*sym.sin(self.x[0])-2*self.x[5]*self.x[9]*sym.cos(self.x[0])+\
+            self.r2*self.x[6]**2*sym.sin(self.x[1])+self.r1*self.x[5]**2*sym.sin(self.x[0]))-\
+            self.r1*FX_contact*(sym.cos(self.x[0])**2)+sym.cos(self.x[0])*(self.r1*FY_contact*sym.sin(self.x[0])-self.u[0])+\
+            FK_extended*W*sym.sin(self.x[0])
+
+        B_contact_extended = W*self.M2*(self.x[5]**2*W*sym.cos(self.x[0])+2*self.x[5]*self.x[9]*sym.sin(self.x[0])+\
+                                       self.r2*self.x[6]**2*sym.cos(self.x[1])+self.r1*self.x[5]**2*sym.cos(self.x[0])-g)+\
+            self.r1*FX_contact*sym.cos(self.x[0])*sym.sin(self.x[0])-sym.sin(self.x[0])*(self.r1*FY_contact*sym.sin(self.x[0])-self.u[0])+\
+            FK_extended*W*sym.cos(self.x[0])
+
+        C_contact_extended = W*(self.M1*self.r1*self.x[5]**2*sym.sin(self.x[0])-FK_extended*sym.sin(self.x[0])+FX_contact)-\
+            sym.cos(self.x[0])*(FY_contact*self.r1*sym.sin(self.x[0])-FX_contact*self.r1*sym.cos(self.x[0])-self.u[0])
+
+        D_contact_extended = W*(self.M1*self.r1*self.x[5]**2*sym.cos(self.x[0])-FK_extended*sym.cos(self.x[0])+FY_contact-self.M1*self.g)-\
+            sym.sin(self.x[0])*(FY_contact*self.r1*sym.sin(self.x[0])-FX_contact*self.r1*sym.cos(self.x[0])-self.u[0])
+
+        E_contact_extended = W*(FK_extended*self.r2*sym.sin(self.x[1]-self.x[0])+self.u[0])-self.r2*sym.cos(self.x[1]-self.x[0])*\
+                            (self.r1*FY_contact*sym.sin(self.x[0])-self.r1*FX_contact*sym.cos(self.x[0])-self.u[0])
+
+        theta1_ddot_contact_extended = (a4*b2/b4-a2)*E_contact_extended/e2-a3*C_contact_extended/c2+a4*b3*D_contact_extended/(b4*d2)+\
+                                      A_contact_extended-a4*B_contact_extended/b4
+
+        theta2_ddot_contact_extended = E_contact_extended/e2-e1/e2*theta1_ddot_contact_extended
+
+        x_ddot_contact_extended = (C_contact_extended-c1*theta1_ddot_contact_extended)/c2
+
+        y_ddot_contact_extended = (D_contact_extended-d1*theta1_ddot_contact_extended)/c2
+
+        w_ddot_contact_extended = (A_contact_extended-a1*theta1_ddot_contact_extended-a2*theta2_ddot_contact_extended-a3*x_ddot_contact_extended)/a4
+
+        contact_extended_ddots = np.asarray([theta1_ddot_contact_extended, theta2_ddot_contact_extended, x_ddot_contact_extended, y_ddot_contact_extended, w_ddot_contact_extended])
+
+        contact_extended_dynamics = np.hstack((self.x[5:], contact_extended_ddots))
+
+
         # contact with retracted leg
         contact_retracted_conditions = np.asarray([self.k0-self.x[4]+self.u[1]<=0,
                                                       self.x[3]-self.ground_height_function(self.x[2])<=0])
 
+        A_contact_retracted = W*self.M2*(self.x[5]**2*W*sym.sin(self.x[0])-2*self.x[5]*self.x[9]*sym.cos(self.x[0])+\
+            self.r2*self.x[6]**2*sym.sin(self.x[1])+self.r1*self.x[5]**2*sym.sin(self.x[0]))-\
+            self.r1*FX_contact*(sym.cos(self.x[0])**2)+sym.cos(self.x[0])*(self.r1*FY_contact*sym.sin(self.x[0])-self.u[0])+\
+            FK_retracted*W*sym.sin(self.x[0])
 
-        # free flight
-        free_flight_dynamics = np.asarray([self.x[1], -self.g])
-        # piston contact
-        piston_contact_dynamics = np.asarray([self.x[1], self.u[0]/self.m-self.g])
-        # piston retract
-        piston_retracted_dynamics = np.asarray([self.l+self.epsilon, -self.x[1]*self.b])
-        self.f_list = np.asarray([free_flight_dynamics, piston_contact_dynamics, piston_retracted_dynamics])
-        self.f_type_list = np.asarray(['continuous', 'continuous', 'discrete'])
+        B_contact_retracted = W*self.M2*(self.x[5]**2*W*sym.cos(self.x[0])+2*self.x[5]*self.x[9]*sym.sin(self.x[0])+\
+                                       self.r2*self.x[6]**2*sym.cos(self.x[1])+self.r1*self.x[5]**2*sym.cos(self.x[0])-g)+\
+            self.r1*FX_contact*sym.cos(self.x[0])*sym.sin(self.x[0])-sym.sin(self.x[0])*(self.r1*FY_contact*sym.sin(self.x[0])-self.u[0])+\
+            FK_retracted*W*sym.cos(self.x[0])
 
-        # contact mode conditions
-        free_flight_conditions = np.asarray([self.x[0]>self.l+self.p])
-        piston_contact_conditions = np.asarray([self.l<self.x[0], self.x[0]<=self.l+self.p])
-        piston_retracted_conditions = np.asarray([self.x[0]<=self.l])
-        self.c_list = np.asarray([free_flight_conditions, piston_contact_conditions, piston_retracted_conditions])
+        C_contact_retracted = W*(self.M1*self.r1*self.x[5]**2*sym.sin(self.x[0])-FK_retracted*sym.sin(self.x[0])+FX_contact)-\
+            sym.cos(self.x[0])*(FY_contact*self.r1*sym.sin(self.x[0])-FX_contact*self.r1*sym.cos(self.x[0])-self.u[0])
+
+        D_contact_retracted = W*(self.M1*self.r1*self.x[5]**2*sym.cos(self.x[0])-FK_retracted*sym.cos(self.x[0])+FY_contact-self.M1*self.g)-\
+            sym.sin(self.x[0])*(FY_contact*self.r1*sym.sin(self.x[0])-FX_contact*self.r1*sym.cos(self.x[0])-self.u[0])
+
+        E_contact_retracted = W*(FK_retracted*self.r2*sym.sin(self.x[1]-self.x[0])+self.u[0])-self.r2*sym.cos(self.x[1]-self.x[0])*\
+                            (self.r1*FY_contact*sym.sin(self.x[0])-self.r1*FX_contact*sym.cos(self.x[0])-self.u[0])
+
+        theta1_ddot_contact_retracted = (a4*b2/b4-a2)*E_contact_retracted/e2-a3*C_contact_retracted/c2+a4*b3*D_contact_retracted/(b4*d2)+\
+                                      A_contact_retracted-a4*B_contact_retracted/b4
+
+        theta2_ddot_contact_retracted = E_contact_retracted/e2-e1/e2*theta1_ddot_contact_retracted
+
+        x_ddot_contact_retracted = (C_contact_retracted-c1*theta1_ddot_contact_retracted)/c2
+
+        y_ddot_contact_retracted = (D_contact_retracted-d1*theta1_ddot_contact_retracted)/c2
+
+        w_ddot_contact_retracted = (A_contact_retracted-a1*theta1_ddot_contact_retracted-a2*theta2_ddot_contact_retracted-a3*x_ddot_contact_retracted)/a4
+
+        contact_retracted_ddots = np.asarray([theta1_ddot_contact_retracted, theta2_ddot_contact_retracted, x_ddot_contact_retracted, y_ddot_contact_retracted, w_ddot_contact_retracted])
+
+        contact_retracted_dynamics = np.hstack((self.x[5:], contact_retracted_ddots))
+
+        self.f_list = np.asarray([flight_extended_dynamics, flight_retracted_dynamics, contact_extended_dynamics, contact_retracted_dynamics])
+        self.f_type_list = np.asarray(['continuous', 'continuous', 'continuous', 'continuous'])
+        self.c_list = np.asarray([flight_extended_conditions, flight_retracted_conditions, contact_extended_conditions, contact_retracted_conditions])
 
         DTHybridSystem.__init__(self, self.f_list, self.f_type_list, self.x, self.u, self.c_list, \
-                                self.initial_env, np.asarray([[0], [self.f_max]]))
+                                self.initial_env)
