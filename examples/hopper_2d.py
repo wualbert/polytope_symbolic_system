@@ -2,7 +2,8 @@ import pydrake.symbolic as sym
 from common.symbolic_system import *
 
 class Hopper_2d(DTHybridSystem):
-    def __init__(self, M1, I1, M2, I2, r1, r2, w, KL, KL2, BL2, KG, BG, k0, g, ground_height_function, initial_state):
+    def __init__(self, M1=1., I1=1., M2=10., I2=10., r1=0.5, r2=0.4, KL=1e3, KL2=1e5, BL2=125, KG=1e4, BG=75, k0=1., \
+                 g=9.8, ground_height_function=lambda x: 0, initial_state=np.asarray([0.,1.,0.,0.,0.,0.,0.,0.,0.,0.])):
 
 
         '''
@@ -15,7 +16,6 @@ class Hopper_2d(DTHybridSystem):
         self.I2 = I2
         self.r1 = r1
         self.r2 = r2
-        self.w = w
         self.KL = KL
         self.KL2 = KL2
         self.BL2 = BL2
@@ -237,3 +237,33 @@ class Hopper_2d(DTHybridSystem):
 
         DTHybridSystem.__init__(self, self.f_list, self.f_type_list, self.x, self.u, self.c_list, \
                                 self.initial_env)
+
+    def do_cg_forward_kinematics(self, env = None):
+        if env is None:
+            env = self.env
+        # extract variables from the environment
+        theta1 = env[self.x[0]]
+        theta2 = env[self.x[1]]
+        x0 = env[self.x[2]]
+        y0 = env[self.x[3]]
+        w = env[self.x[4]]
+        theta1_dot = env[self.x[5]]
+        theta2_dot = env[self.x[6]]
+        x0_dot = env[self.x[7]]
+        y0_dot = env[self.x[8]]
+        w_dot =  env[self.x[9]]
+
+        # compute forward kinematics
+        x1 = x0+self.r1*np.sin(theta1)
+        y1 = y0+self.r1*np.cos(theta1)
+        x2 = x0+w*np.sin(theta1)+self.r2*np.cos(theta2)
+        y2 = y0+w*np.cos(theta1)+self.r2*np.sin(theta2)
+
+        # compute derivatives
+        x1_dot = x0_dot+self.r1*np.cos(theta1)*theta1_dot
+        y1_dot = y0_dot-self.r1*np.sin(theta1)*theta1_dot
+        x2_dot = x0_dot+w_dot*np.sin(theta1)+w*np.cos(theta1)*theta1_dot+self.r2*np.cos(theta2)*theta2_dot
+        y2_dot = y1_dot+w_dot*np.cos(theta1)-w*np.sin(theta1)*theta1_dot-self.r2*np.sin(theta2)*theta2_dot
+
+        # TODO: implement derivatives
+        return x1, y1, x2, y2, x1_dot, y1_dot, x2_dot, y2_dot
