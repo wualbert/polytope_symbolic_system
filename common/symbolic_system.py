@@ -55,13 +55,17 @@ class ContinuousDynamics(Dynamics):
     def construct_linearized_system_at(self, env):
         return ContinuousLinearDynamics(sym.Evaluate(self.A, env), sym.Evaluate(self.B, env), sym.Evaluate(self.c, env))
 
-    def evaluate_xdot(self, env, linearize=False):
+    def evaluate_xdot(self, env, linearize):
         if linearize:
             linsys = self.construct_linearized_system_at(env)
             x_env = extract_variable_value_from_env(self.x, env)
             u_env = extract_variable_value_from_env(self.u, env)
             return linsys.evaluate_xdot(x_env, u_env)
         else:
+            for i, fi in enumerate(self.f):
+                print('f: %i' %i)
+                sym.Evaluate(np.atleast_2d([fi]), env)
+                print('f: %i done' %i)
             return sym.Evaluate(self.f, env)
 
 class DiscreteLinearDynamics(Dynamics):
@@ -257,6 +261,7 @@ class DTHybridSystem:
             if not is_in_mode:
                 continue
             if self.dynamics_list[i].type == 'continuous':
+                print('Mode is %i' %i)
                 delta_x = self.dynamics_list[i].evaluate_xdot(new_env, linearlize)*step_size
             elif self.dynamics_list[i].type == 'discrete':
                 x_new = self.dynamics_list[i].evaluate_x_next(new_env, linearlize)
