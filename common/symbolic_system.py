@@ -62,10 +62,6 @@ class ContinuousDynamics(Dynamics):
             u_env = extract_variable_value_from_env(self.u, env)
             return linsys.evaluate_xdot(x_env, u_env)
         else:
-            for i, fi in enumerate(self.f):
-                print('f: %i' % i)
-                sym.Evaluate(np.atleast_2d([fi]), env)
-                print('f: %i done' % i)
             return sym.Evaluate(self.f, env)
 
 class DiscreteLinearDynamics(Dynamics):
@@ -193,7 +189,6 @@ class DTContinuousSystem:
 
 def in_mode(c_i, env):
     for c_ij in c_i:
-        print(env)
         if c_ij.Evaluate(env) is False:
             return False
     return True

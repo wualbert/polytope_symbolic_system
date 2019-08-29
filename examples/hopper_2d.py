@@ -246,7 +246,13 @@ class Hopper_2d(DTHybridSystem):
         DTHybridSystem.__init__(self, self.f_list, self.f_type_list, self.x, self.u, self.c_list, \
                                 self.initial_env)
 
-    def do_cg_forward_kinematics(self, env = None):
+    def get_cg_coordinate_states(self, env = None):
+        """
+        Convert the state into the representation used in MIT 6.832 PSet4
+        [x2, y2, theta2, theta1-theta2, w]
+        :param env:
+        :return:
+        """
         if env is None:
             env = self.env
         # extract variables from the environment
@@ -273,7 +279,7 @@ class Hopper_2d(DTHybridSystem):
         x2_dot = x0_dot+w_dot*np.sin(theta1)+w*np.cos(theta1)*theta1_dot+self.r2*np.cos(theta2)*theta2_dot
         y2_dot = y1_dot+w_dot*np.cos(theta1)-w*np.sin(theta1)*theta1_dot-self.r2*np.sin(theta2)*theta2_dot
 
-        return x1, y1, x2, y2, x1_dot, y1_dot, x2_dot, y2_dot
+        return x2, y2, theta2, theta1-theta2, w, x2_dot, y2_dot, theta2_dot, theta1_dot-theta2_dot, w_dot
 
     def do_internal_updates(self):
         # extract variables from the environment
