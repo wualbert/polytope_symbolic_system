@@ -27,7 +27,7 @@ class Hopper_2d(DTHybridSystem):
         self.ground_height_function = ground_height_function
 
         # state machine for touchdown detection
-        self.xTD = 0
+        self.xTD = sym.Variable('xTD')
         self.was_in_contact = False
 
         # Symbolic variables
@@ -41,6 +41,7 @@ class Hopper_2d(DTHybridSystem):
         self.initial_env = {}
         for i, state in enumerate(initial_state):
             self.initial_env[self.x[i]]=state
+        self.initial_env[self.xTD] = 0
         # print(self.initial_env)
 
         # Dynamic modes
@@ -296,5 +297,5 @@ class Hopper_2d(DTHybridSystem):
         if not self.was_in_contact and y0-self.ground_height_function(x0)<=0:
             # just touched down
             # set the touchdown point
-            self.xTD = x0
+            self.env[self.xTD] = x0
         self.was_in_contact=y0-self.ground_height_function(x0)<=0
