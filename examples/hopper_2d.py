@@ -24,8 +24,11 @@ class Hopper_2d(DTHybridSystem):
         self.KG = KG
         self.BG = BG
         self.g = g
-        self.xTD = 0
         self.ground_height_function = ground_height_function
+
+        # state machine for touchdown detection
+        self.xTD = 0
+        self.was_in_contact = False
 
         # Symbolic variables
         # State variables are s = [theta1, theta2, x0, y0, w]
@@ -271,3 +274,21 @@ class Hopper_2d(DTHybridSystem):
         y2_dot = y1_dot+w_dot*np.cos(theta1)-w*np.sin(theta1)*theta1_dot-self.r2*np.sin(theta2)*theta2_dot
 
         return x1, y1, x2, y2, x1_dot, y1_dot, x2_dot, y2_dot
+
+    def do_internal_updates(self):
+        # extract variables from the environment
+        theta1 = self.env[self.x[0]]
+        theta2 = self.env[self.x[1]]
+        x0 = self.env[self.x[2]]
+        y0 = self.env[self.x[3]]
+        w = self.env[self.x[4]]
+        theta1_dot = self.env[self.x[5]]
+        theta2_dot = self.env[self.x[6]]
+        x0_dot = self.env[self.x[7]]
+        y0_dot = self.env[self.x[8]]
+        w_dot =  self.env[self.x[9]]
+        if not self.was_in_contact and y0-self.ground_height_function(x0)<=0:
+            # just touched down
+            # set the touchdown point
+            self.xTD = x0
+        self.was_in_contact=y0-self.ground_height_function(x0)<=0

@@ -63,9 +63,9 @@ class ContinuousDynamics(Dynamics):
             return linsys.evaluate_xdot(x_env, u_env)
         else:
             for i, fi in enumerate(self.f):
-                print('f: %i' %i)
+                print('f: %i' % i)
                 sym.Evaluate(np.atleast_2d([fi]), env)
-                print('f: %i done' %i)
+                print('f: %i done' % i)
             return sym.Evaluate(self.f, env)
 
 class DiscreteLinearDynamics(Dynamics):
@@ -193,6 +193,7 @@ class DTContinuousSystem:
 
 def in_mode(c_i, env):
     for c_ij in c_i:
+        print(env)
         if c_ij.Evaluate(env) is False:
             return False
     return True
@@ -238,6 +239,9 @@ class DTHybridSystem:
         self.current_mode = -1
         #TODO
 
+    def do_internal_updates(self):
+        pass
+
     def forward_step(self, u=None, linearlize=False, modify_system=True, step_size = 1e-3, return_as_env = False,
                      return_mode = False, starting_state=None):
         if starting_state is not None:
@@ -261,7 +265,6 @@ class DTHybridSystem:
             if not is_in_mode:
                 continue
             if self.dynamics_list[i].type == 'continuous':
-                print('Mode is %i' %i)
                 delta_x = self.dynamics_list[i].evaluate_xdot(new_env, linearlize)*step_size
             elif self.dynamics_list[i].type == 'discrete':
                 x_new = self.dynamics_list[i].evaluate_x_next(new_env, linearlize)
@@ -283,6 +286,8 @@ class DTHybridSystem:
                 new_env[self.x[i]] = x_new[i]
         else:
             raise ValueError
+
+        self.do_internal_updates()
 
         #return options
         if return_as_env and not return_mode:
