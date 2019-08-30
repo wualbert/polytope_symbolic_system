@@ -315,6 +315,9 @@ class DTHybridSystem:
                 continue
 
             current_linsys = self.get_linearization(state, mode)
+            if current_linsys is None:
+                # this should not happen?
+                raise Exception
             u_bar = (self.input_limits[1, :] + self.input_limits[0, :]) / 2
             u_diff = (self.input_limits[1, :] - self.input_limits[0, :]) / 2
             # print(current_linsys.A, current_linsys.B, current_linsys.c)
@@ -351,7 +354,8 @@ class DTHybridSystem:
         else:
             env = self._state_to_env(state)
             if mode is not None:
-                assert in_mode(self.c_list[mode], env)
+                # FIXME: construct but don't ask questions?
+                # assert in_mode(self.c_list[mode], env)
                 return self.dynamics_list[mode].construct_linearized_system_at(env)
             for mode, c_i in enumerate(self.c_list):
                 if in_mode(c_i, env):
