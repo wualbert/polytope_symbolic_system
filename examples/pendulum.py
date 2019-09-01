@@ -1,5 +1,5 @@
 import pydrake.symbolic as sym
-from common.symbolic_system import *
+from polytope_symbolic_system.common.symbolic_system import *
 
 class Pendulum(DTContinuousSystem):
     def __init__(self, m=1, m_l=0, l=1, g=1, b=0, initial_state = np.array([0,0]), input_limits =None):
