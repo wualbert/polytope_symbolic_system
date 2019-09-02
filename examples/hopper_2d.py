@@ -300,3 +300,19 @@ class Hopper_2d(DTHybridSystem):
             self.env[self.xTD] = x0
         self.was_in_contact=y0-self.ground_height_function(x0)<=0
         #FIXME: _state_to_env does not set self.env[self.xTD]
+
+    def _state_to_env(self, state, u=None):
+        env = {}
+        # print('state',state)
+        for i, s_i in enumerate(state):
+            env[self.x[i]] = s_i
+        if u is None:
+            for u_i in self.u:
+                env[u_i] = 0
+        else:
+            for i, u_i in enumerate(u):
+                env[self.u[i]] = u[i]
+        # if touch down, set xTD
+        if state[3]-self.ground_height_function(state[2])<=0:
+            env[self.xTD] = state[2]
+        return env
