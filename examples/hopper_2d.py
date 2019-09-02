@@ -299,3 +299,4 @@ class Hopper_2d(DTHybridSystem):
             # set the touchdown point
             self.env[self.xTD] = x0
         self.was_in_contact=y0-self.ground_height_function(x0)<=0
+        #FIXME: _state_to_env does not set self.env[self.xTD]

@@ -328,8 +328,6 @@ class DTHybridSystem:
                 x = np.atleast_2d(x).reshape(-1, 1)
                 assert (len(x) == len(state))
                 G = np.atleast_2d(np.dot(current_linsys.B * step_size, np.diag(u_diff)))
-                # print('x', x)
-                # print('G', G)
 
             elif self.dynamics_list[mode].type == 'discrete':
                 x = np.ndarray.flatten(
@@ -345,7 +343,7 @@ class DTHybridSystem:
             if use_convex_hull:
                 polytopes_list.append(convex_hull_of_point_and_polytope(x, zonotope(x,G)))
             else:
-                polytopes_list.append(zonotope(x, G))
+                polytopes_list.append(to_AH_polytope(zonotope(x, G)))
         return np.asarray(polytopes_list)
 
     def get_linearization(self, state=None, mode=None):
