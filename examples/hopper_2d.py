@@ -41,10 +41,10 @@ class Hopper_2d(DTHybridSystem):
         # print(self.initial_env)
 
         # Dynamic modes
-        Fx_contact =
-        Fx_flight =
-        Fy_contact =
-        Fy_flight =
+        Fx_contact = self.k_g*(self.x[0]-self.xTD)-self.b_g*self.x[5]
+        Fx_flight = 0.
+        Fy_contact = self.k_g*(self.x[1]-self.ground_height_function[self.x[0]])-self.b_g*self.x[6]
+        Fy_flight = 0.
 
         R = self.x[4]-self.l1
         # EOM is obtained from Russ Tedrake's Thesis
@@ -76,9 +76,15 @@ class Hopper_2d(DTHybridSystem):
             (A*b1*c1*d4*e1 - B*a1*c4*d1*e1 - C*a1*b1*d4*e1 + D*a1*b1*c4*e1 + E*a1*b1*c2*d4 - E*a1*b1*c4*d2 + E*a1*b2*c4*d1 - E*a2*b1*c1*d4)/(a1*b1*c2*d4*e2 - a1*b1*c3*d4*e1 - a1*b1*c4*d2*e2 + a1*b1*c4*d3*e1 + a1*b2*c4*d1*e2 - a2*b1*c1*d4*e2),\
             (A*b1*c1*d2*e2 - A*b1*c1*d3*e1 - A*b2*c1*d1*e2 - B*a1*c2*d1*e2 + B*a1*c3*d1*e1 + B*a2*c1*d1*e2 - C*a1*b1*d2*e2 + C*a1*b1*d3*e1 + C*a1*b2*d1*e2 + D*a1*b1*c2*e2 - D*a1*b1*c3*e1 - D*a2*b1*c1*e2 - E*a1*b1*c2*d3 + E*a1*b1*c3*d2 - E*a1*b2*c3*d1 + E*a2*b1*c1*d3)/(a1*b1*c2*d4*e2 - a1*b1*c3*d4*e1 - a1*b1*c4*d2*e2 + a1*b1*c4*d3*e1 + a1*b2*c4*d1*e2 - a2*b1*c1*d4*e2)])
 
-        self.f_list = np.asarray([flight_extended_dynamics, flight_retracted_dynamics, contact_extended_dynamics, contact_retracted_dynamics])
-        self.f_type_list = np.asarray(['continuous', 'continuous', 'continuous', 'continuous'])
-        self.c_list = np.asarray([flight_extended_conditions, flight_retracted_conditions, contact_extended_conditions, contact_retracted_conditions])
+        flight_dynamics = get_dynamics(Fx_flight, Fy_flight)
+        contact_dynamics = get_dynamics(Fx_contact, Fy_contact)
+
+        flight_conditions = np.asarray([self.x[1] > self.ground_height_function[self.x[0]]])
+        contact_coditions = np.asarray([self.x[1] <= self.ground_height_function[self.x[0]]])
+
+        self.f_list = np.asarray([flight_dynamics, contact_dynamics])
+        self.f_type_list = np.asarray(['continuous', 'continuous'])
+        self.c_list = np.asarray([flight_conditions, contact_coditions])
 
         DTHybridSystem.__init__(self, self.f_list, self.f_type_list, self.x, self.u, self.c_list, \
                                 self.initial_env)
