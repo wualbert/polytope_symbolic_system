@@ -1,9 +1,9 @@
 import pydrake.symbolic as sym
 import numpy as np
-from common.symbolic_system import DTHybridSystem
+from common.symbolic_system import DTHybridSystem, in_mode, extract_variable_value_from_env
 
 class Hopper_2d(DTHybridSystem):
-    def __init__(self, m=1, J=10, m_l=0.1, J_l=0.1, l1=0.5, l2=0.05, k_g=1e4, b_g=750,\
+    def __init__(self, m=10, J=10, m_l=1, J_l=1, l1=0.0, l2=0.0, k_g=6e4, b_g=60,\
                  g=9.8, ground_height_function=lambda x: 0, initial_state=np.asarray([0.,0.,0.,1.5,1.0,0.,0.,0.,0.,0.])):
 
 
@@ -21,7 +21,8 @@ class Hopper_2d(DTHybridSystem):
         self.b_g = b_g
         self.g = g
         self.ground_height_function = ground_height_function
-
+        self.r_min = 0.2
+        self.r_max = 15
         # state machine for touchdown detection
         self.xTD = sym.Variable('xTD')
         self.was_in_contact = False
@@ -88,7 +89,7 @@ class Hopper_2d(DTHybridSystem):
         self.c_list = np.asarray([flight_conditions, contact_coditions])
 
         DTHybridSystem.__init__(self, self.f_list, self.f_type_list, self.x, self.u, self.c_list, \
-                                self.initial_env)
+                                self.initial_env, input_limits=np.vstack([[-10, -1e4],[10, 1e4]]))
 
     def get_cg_coordinate_states(self, env = None):
         """
@@ -150,3 +151,64 @@ class Hopper_2d(DTHybridSystem):
         # FIXME: This is sketchy
         env[self.xTD] = state[0]
         return env
+
+    def forward_step(self, u=None, linearlize=False, modify_system=True, step_size = 1e-3, return_as_env = False,
+                     return_mode = False, starting_state=None):
+        if starting_state is not None:
+            new_env = self._state_to_env(starting_state, u)
+        elif not modify_system:
+            new_env = self.env.copy()
+        else:
+            new_env = self.env
+        if u is not None:
+            for i in range(u.shape[0]):
+                new_env[self.u[i]] = min(max(u[i],self.input_limits[0,i]),self.input_limits[1,i])
+        else:
+            for i in range(self.u.shape[0]):
+                new_env[self.u[i]] = 0
+        # Check for which mode the system is in
+        delta_x = None
+        x_new = None
+        mode = -1
+        for i, c_i in enumerate(self.c_list):
+            is_in_mode = in_mode(c_i,new_env)
+            if not is_in_mode:
+                continue
+            if self.dynamics_list[i].type == 'continuous':
+                delta_x = self.dynamics_list[i].evaluate_xdot(new_env, linearlize)*step_size
+            elif self.dynamics_list[i].type == 'discrete':
+                x_new = self.dynamics_list[i].evaluate_x_next(new_env, linearlize)
+            else:
+                raise ValueError
+            mode = i
+            break
+        assert(mode != -1) # The system should always be in one mode
+        # print('mode', mode)
+        # print(self.env)
+        #FIXME: check if system is in 2 modes (illegal)
+
+        #assign new xs
+        if self.dynamics_list[mode].type=='continuous':
+            for i in range(delta_x.shape[0]):
+                new_env[self.x[i]] += delta_x[i]
+        elif self.dynamics_list[mode].type=='discrete':
+            for i in range(x_new.shape[0]):
+                new_env[self.x[i]] = x_new[i]
+        else:
+            raise ValueError
+
+        # if new_env[self.x[4]] < self.r_min or new_env[self.x[4]]>self.r_max:
+        #     new_env[self.x[4]] = min(max(new_env[self.x[4]], self.r_min), self.r_max)
+        #     new_env[self.x[9]] = 0
+        self.do_internal_updates()
+
+        #return options
+        if return_as_env and not return_mode:
+            return new_env
+        elif return_as_env and return_mode:
+            return new_env, mode
+        elif not return_as_env and not return_mode:
+            return extract_variable_value_from_env(self.x, new_env)
+        else:
+            return extract_variable_value_from_env(self.x, new_env), mode
+

@@ -49,15 +49,14 @@ def test_freefall_hopper():
     plt.show()
 
 def test_pushoff_hopper():
-    initial_state = np.asarray([0.5, 5, 0, 0, 10, 0.5, 0., 0., 0., 0.])
+    initial_state = np.asarray([0.5, 5, 0, 0, 10, 0, 0., 0., 0., 0.])
     hopper = Hopper_2d(initial_state=initial_state)
     # simulate the hopper
-    state_count = 100000
+    state_count = 10000
     states = np.zeros([10, state_count])
     states[:, 0] = initial_state
-    cg_coordinate_states = np.zeros([10, state_count])
     end_count = None
-    step_size = 1e-4
+    step_size = 1e-3
     i = 0
     try:
         for i in range(1,state_count):
@@ -65,12 +64,14 @@ def test_pushoff_hopper():
                 print('iteration %i' %i)
             # foot length controller
             f = 0
-            if states[1, i-1]<=0:
-                f = -5000
-            states[:, i] = hopper.forward_step(step_size=step_size, u=np.asarray([-0.01*states[4,i-1], f]))
+            # if states[1, i-1]<=0 and states[4,i-1]>0 and states[4,i-1]<15:
+            #     f = 500
+            # elif states[4,i-1]<0 or states[4,i-1]>15:
+            #     f = -100*(states[4,i-1]-initial_state[4])-1*states[9,i-1]
+            states[:, i] = hopper.forward_step(step_size=step_size, u=np.asarray([0, f]))
             # print(states[:,i])
-            if i%100==0:
-                print(hopper.env[hopper.xTD], hopper.env[hopper.x[1]], hopper.was_in_contact)
+            if i%100==0 or hopper.was_in_contact:
+                print(hopper.env[hopper.xTD]-hopper.env[hopper.x[0]], hopper.env[hopper.x[1]], hopper.was_in_contact)
     except Exception as e:
         print("Simulation terminated due to exception: %s" %e)
         end_count = i
