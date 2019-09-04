@@ -2,6 +2,101 @@ from examples.hopper_2d import Hopper_2d
 import matplotlib.pyplot as plt
 import numpy as np
 import math
+def test_freefall_hopper():
+    initial_state = np.asarray([0.5, 5, 0, 0, 2, 0., 0, 0., 0., 0.])
+    hopper = Hopper_2d(initial_state=initial_state)
+    # simulate the hopper
+    state_count = 30000
+    states = np.zeros([10, state_count])
+    states[:, 0] = initial_state
+    cg_coordinate_states = np.zeros([10, state_count])
+    end_count = None
+    step_size = 1e-4
+    i = 0
+    try:
+        for i in range(1,state_count):
+            if i%10000==0:
+                print('iteration %i' %i)
+            # foot length controller
+            states[:, i] = hopper.forward_step(step_size=step_size, u=np.asarray([0, 0]))
+            # print(states[:,i])
+            if i%100==0:
+                print(hopper.env[hopper.xTD], hopper.env[hopper.x[1]], hopper.was_in_contact)
+    except Exception as e:
+        print("Simulation terminated due to exception: %s" %e)
+        end_count = i
+        print('Simulation terminated at step %i' %i)
+        print('Env is:', hopper.get_current_state())
+    # plot the Raibert coordinate states
+    fig1, ax1 = plt.subplots(5,1)
+    labels1 = ['$x_{ft}$', '$y_{ft}$', '$\\theta$', '$\\phi$', 'r']
+    for i in range(5):
+        ax1[i].plot(states[i,0:end_count])
+        ax1[i].set_xlabel('Steps')
+        ax1[i].set_ylabel(labels1[i])
+    ax1[1].set_ylim([0,6])
+    ax1[4].set_ylim([0,6])
+
+    fig3, ax3 = plt.subplots(5,1)
+    labels3 = ['$\\dot{x_{ft}}$', '$\\dot{y_{ft}}$', '$\\dot{\\theta}$', '$\\dot{\\phi}$', '$\\dot{r}$']
+    for i in range(5):
+        ax3[i].plot(states[i+5,1:end_count])
+        ax3[i].set_xlabel('Steps')
+        ax3[i].set_ylabel(labels3[i])
+    ax3[1].set_ylim([-6,6])
+    ax3[4].set_ylim([-6,6])
+
+    plt.show()
+
+def test_pushoff_hopper():
+    initial_state = np.asarray([0.5, 5, 0, 0, 10, 0.5, 0., 0., 0., 0.])
+    hopper = Hopper_2d(initial_state=initial_state)
+    # simulate the hopper
+    state_count = 100000
+    states = np.zeros([10, state_count])
+    states[:, 0] = initial_state
+    cg_coordinate_states = np.zeros([10, state_count])
+    end_count = None
+    step_size = 1e-4
+    i = 0
+    try:
+        for i in range(1,state_count):
+            if i%10000==0:
+                print('iteration %i' %i)
+            # foot length controller
+            f = 0
+            if states[1, i-1]<=0:
+                f = -5000
+            states[:, i] = hopper.forward_step(step_size=step_size, u=np.asarray([-0.01*states[4,i-1], f]))
+            # print(states[:,i])
+            if i%100==0:
+                print(hopper.env[hopper.xTD], hopper.env[hopper.x[1]], hopper.was_in_contact)
+    except Exception as e:
+        print("Simulation terminated due to exception: %s" %e)
+        end_count = i
+        print('Simulation terminated at step %i' %i)
+        print('Env is:', hopper.get_current_state())
+    # plot the Raibert coordinate states
+    fig1, ax1 = plt.subplots(5,1)
+    labels1 = ['$x_{ft}$', '$y_{ft}$', '$\\theta$', '$\\phi$', 'r']
+    for i in range(5):
+        ax1[i].plot(states[i,0:end_count])
+        ax1[i].set_xlabel('Steps')
+        ax1[i].set_ylabel(labels1[i])
+    ax1[1].set_ylim([0,6])
+    ax1[4].set_ylim([0,6])
+
+    fig3, ax3 = plt.subplots(5,1)
+    labels3 = ['$\\dot{x_{ft}}$', '$\\dot{y_{ft}}$', '$\\dot{\\theta}$', '$\\dot{\\phi}$', '$\\dot{r}$']
+    for i in range(5):
+        ax3[i].plot(states[i+5,1:end_count])
+        ax3[i].set_xlabel('Steps')
+        ax3[i].set_ylabel(labels3[i])
+    ax3[1].set_ylim([-6,6])
+    ax3[4].set_ylim([-6,6])
+
+    plt.show()
+
 
 def test_raibert_controller_hopper(desired_lateral_velocity=0.0):
     initial_state = np.asarray([0.,0.,15.,1.,0.8,0.,0.,0.,0.,0.])
@@ -94,4 +189,4 @@ def test_raibert_controller_hopper(desired_lateral_velocity=0.0):
     plt.show()
 
 if __name__=='__main__':
-    test_raibert_controller_hopper()
+    test_pushoff_hopper()
