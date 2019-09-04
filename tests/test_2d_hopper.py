@@ -63,12 +63,17 @@ def test_pushoff_hopper():
             if i%10000==0:
                 print('iteration %i' %i)
             # foot length controller
-            f = 0
             # if states[1, i-1]<=0 and states[4,i-1]>0 and states[4,i-1]<15:
             #     f = 500
             # elif states[4,i-1]<0 or states[4,i-1]>15:
             #     f = -100*(states[4,i-1]-initial_state[4])-1*states[9,i-1]
-            states[:, i] = hopper.forward_step(step_size=step_size, u=np.asarray([0, f]))
+            if states[7,i]<0 and states[2,i]<1e-3:
+                u = np.asarray([0,80])
+            elif states[7,i]>=0 and states[2,i]<1e-3:
+                u = np.asarray([0, 250])
+            else:
+                u = np.asarray([0, 20])
+            states[:, i] = hopper.forward_step(step_size=step_size, u=u)
             # print(states[:,i])
             if i%100==0 or hopper.was_in_contact:
                 print(hopper.env[hopper.xTD]-hopper.env[hopper.x[0]], hopper.env[hopper.x[1]], hopper.was_in_contact)

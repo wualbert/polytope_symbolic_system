@@ -21,8 +21,7 @@ class Hopper_2d(DTHybridSystem):
         self.b_g = b_g
         self.g = g
         self.ground_height_function = ground_height_function
-        self.r_min = 0.2
-        self.r_max = 15
+        self.r0 = 10
         # state machine for touchdown detection
         self.xTD = sym.Variable('xTD')
         self.was_in_contact = False
@@ -63,14 +62,14 @@ class Hopper_2d(DTHybridSystem):
         d4 = -self.m*R*sym.cos(self.x[2])
         e1 = self.J_l*self.l2*sym.cos(self.x[2]-self.x[3])
         e2 = -self.J*R
-
+        F_leg = -self.u[1]*(self.x[4]-self.r0)-2.8*self.x[9]
         def get_ddots(Fx, Fy):
             alpha = (self.l1*Fy*sym.sin(self.x[2])-self.l1*Fx*sym.cos(self.x[2])-self.u[0])
-            A = sym.cos(self.x[2])*alpha-R*(Fx-self.u[1]*sym.sin(self.x[2])-self.m_l*self.l1*self.x[7]**2*sym.sin(self.x[2]))
-            B = sym.sin(self.x[2])*alpha+R*(self.m_l*self.l1*self.x[7]**2*sym.cos(self.x[2])+Fy-self.u[1]*sym.cos(self.x[2])-self.m_l*self.g)
-            C = sym.cos(self.x[2])*alpha+R*self.u[1]*sym.sin(self.x[2])+self.m*R*(self.x[4]*self.x[7]**2*sym.sin(self.x[2])+self.l2*self.x[8]**2*sym.sin(self.x[3])-2*self.x[9]*self.x[7]*sym.cos(self.x[2]))
-            D = sym.sin(self.x[2])*alpha-R*(self.u[1]*sym.cos(self.x[2])-self.m*self.g)-self.m*R*(2*self.x[9]*self.x[7]*sym.sin(self.x[2])+self.x[4]*self.x[7]**2*sym.cos(self.x[2])+self.l2*self.x[8]**2*sym.cos(self.x[3]))
-            E = self.l2*sym.cos(self.x[2]-self.x[3])*alpha-R*(self.l2*self.u[1]*sym.sin(self.x[3]-self.x[2])+self.u[0])
+            A = sym.cos(self.x[2])*alpha-R*(Fx-F_leg*sym.sin(self.x[2])-self.m_l*self.l1*self.x[7]**2*sym.sin(self.x[2]))
+            B = sym.sin(self.x[2])*alpha+R*(self.m_l*self.l1*self.x[7]**2*sym.cos(self.x[2])+Fy-F_leg*sym.cos(self.x[2])-self.m_l*self.g)
+            C = sym.cos(self.x[2])*alpha+R*F_leg*sym.sin(self.x[2])+self.m*R*(self.x[4]*self.x[7]**2*sym.sin(self.x[2])+self.l2*self.x[8]**2*sym.sin(self.x[3])-2*self.x[9]*self.x[7]*sym.cos(self.x[2]))
+            D = sym.sin(self.x[2])*alpha-R*(F_leg*sym.cos(self.x[2])-self.m*self.g)-self.m*R*(2*self.x[9]*self.x[7]*sym.sin(self.x[2])+self.x[4]*self.x[7]**2*sym.cos(self.x[2])+self.l2*self.x[8]**2*sym.cos(self.x[3]))
+            E = self.l2*sym.cos(self.x[2]-self.x[3])*alpha-R*(self.l2*F_leg*sym.sin(self.x[3]-self.x[2])+self.u[0])
 
             return np.asarray([(A*b1*c2*d4*e2 - A*b1*c3*d4*e1 - A*b1*c4*d2*e2 + A*b1*c4*d3*e1 + A*b2*c4*d1*e2 - B*a2*c4*d1*e2 - C*a2*b1*d4*e2 + D*a2*b1*c4*e2 + E*a2*b1*c3*d4 - E*a2*b1*c4*d3)/(a1*b1*c2*d4*e2 - a1*b1*c3*d4*e1 - a1*b1*c4*d2*e2 + a1*b1*c4*d3*e1 + a1*b2*c4*d1*e2 - a2*b1*c1*d4*e2),\
             (A*b2*c1*d4*e2 + B*a1*c2*d4*e2 - B*a1*c3*d4*e1 - B*a1*c4*d2*e2 + B*a1*c4*d3*e1 - B*a2*c1*d4*e2 - C*a1*b2*d4*e2 + D*a1*b2*c4*e2 + E*a1*b2*c3*d4 - E*a1*b2*c4*d3)/(a1*b1*c2*d4*e2 - a1*b1*c3*d4*e1 - a1*b1*c4*d2*e2 + a1*b1*c4*d3*e1 + a1*b2*c4*d1*e2 - a2*b1*c1*d4*e2),\
