@@ -49,7 +49,7 @@ def test_freefall_hopper():
     plt.show()
 
 def test_pushoff_hopper():
-    initial_state = np.asarray([0.5, 5, 0, 0, 10, 0, 0., 0., 0., 0.])
+    initial_state = np.asarray([0.5, 1, 0, 0, 5, 0, 0., 0., 0., 0.])
     hopper = Hopper_2d(initial_state=initial_state)
     # simulate the hopper
     state_count = 10000
@@ -67,12 +67,13 @@ def test_pushoff_hopper():
             #     f = 500
             # elif states[4,i-1]<0 or states[4,i-1]>15:
             #     f = -100*(states[4,i-1]-initial_state[4])-1*states[9,i-1]
-            if states[7,i]<0 and states[2,i]<1e-3:
-                u = np.asarray([0,80])
-            elif states[7,i]>=0 and states[2,i]<1e-3:
-                u = np.asarray([0, 250])
+            if states[9,i-1]<0:
+                u = np.asarray([0,40])
+            elif states[9,i-1]>=0:
+                u = np.asarray([0,300])
             else:
-                u = np.asarray([0, 20])
+                raise Exception
+                u = np.asarray([0, 0])
             states[:, i] = hopper.forward_step(step_size=step_size, u=u)
             # print(states[:,i])
             if i%100==0 or hopper.was_in_contact:
@@ -89,8 +90,8 @@ def test_pushoff_hopper():
         ax1[i].plot(states[i,0:end_count])
         ax1[i].set_xlabel('Steps')
         ax1[i].set_ylabel(labels1[i])
-    ax1[1].set_ylim([0,6])
-    ax1[4].set_ylim([0,6])
+    ax1[1].set_ylim([0,2])
+    ax1[4].set_ylim([0,2])
 
     fig3, ax3 = plt.subplots(5,1)
     labels3 = ['$\\dot{x_{ft}}$', '$\\dot{y_{ft}}$', '$\\dot{\\theta}$', '$\\dot{\\phi}$', '$\\dot{r}$']

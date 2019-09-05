@@ -3,7 +3,7 @@ import numpy as np
 from common.symbolic_system import DTHybridSystem, in_mode, extract_variable_value_from_env
 
 class Hopper_2d(DTHybridSystem):
-    def __init__(self, m=10, J=10, m_l=1, J_l=1, l1=0.0, l2=0.0, k_g=6e4, b_g=60,\
+    def __init__(self, m=10, J=10, m_l=1, J_l=1, l1=0.0, l2=0.0, k_g=1e4, b_g=50,\
                  g=9.8, ground_height_function=lambda x: 0, initial_state=np.asarray([0.,0.,0.,1.5,1.0,0.,0.,0.,0.,0.])):
 
 
@@ -21,7 +21,8 @@ class Hopper_2d(DTHybridSystem):
         self.b_g = b_g
         self.g = g
         self.ground_height_function = ground_height_function
-        self.r0 = 10
+        self.r0 = 5
+        self.b_leg = 0
         # state machine for touchdown detection
         self.xTD = sym.Variable('xTD')
         self.was_in_contact = False
@@ -62,7 +63,7 @@ class Hopper_2d(DTHybridSystem):
         d4 = -self.m*R*sym.cos(self.x[2])
         e1 = self.J_l*self.l2*sym.cos(self.x[2]-self.x[3])
         e2 = -self.J*R
-        F_leg = -self.u[1]*(self.x[4]-self.r0)-2.8*self.x[9]
+        F_leg = -self.u[1]*(self.x[4]-self.r0)-self.b_leg*self.x[9]
         def get_ddots(Fx, Fy):
             alpha = (self.l1*Fy*sym.sin(self.x[2])-self.l1*Fx*sym.cos(self.x[2])-self.u[0])
             A = sym.cos(self.x[2])*alpha-R*(Fx-F_leg*sym.sin(self.x[2])-self.m_l*self.l1*self.x[7]**2*sym.sin(self.x[2]))
@@ -88,7 +89,7 @@ class Hopper_2d(DTHybridSystem):
         self.c_list = np.asarray([flight_conditions, contact_coditions])
 
         DTHybridSystem.__init__(self, self.f_list, self.f_type_list, self.x, self.u, self.c_list, \
-                                self.initial_env, input_limits=np.vstack([[-10, -1e4],[10, 1e4]]))
+                                self.initial_env, input_limits=np.vstack([[-10,50], [10,300]]))
 
     def get_cg_coordinate_states(self, env = None):
         """
