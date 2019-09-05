@@ -311,9 +311,9 @@ class DTHybridSystem:
                 upper_bound_env[x_i] = state[i]
                 unactuated_env[x_i] = state[i]
 
-            # if (not in_mode(c_i, lower_bound_env)) and (not in_mode(c_i, upper_bound_env)) and not in_mode(c_i, unactuated_env):
-            #     print('dropping mode %i' %mode)
-            #     continue
+            if (not in_mode(c_i, lower_bound_env)) and (not in_mode(c_i, upper_bound_env)) and not in_mode(c_i, unactuated_env):
+                # print('dropping mode %i' %mode)
+                continue
 
             current_linsys = self.get_linearization(state, mode)
             if current_linsys is None:
@@ -321,10 +321,11 @@ class DTHybridSystem:
                 raise Exception
             u_bar = (self.input_limits[1, :] + self.input_limits[0, :]) / 2
             u_diff = (self.input_limits[1, :] - self.input_limits[0, :]) / 2
-            # if mode==1:
+            # print(mode)
             #     print('A', current_linsys.A)
-            #     print('B', current_linsys.B)
+            # print('B', current_linsys.B)
             #     print('c', current_linsys.c)
+
             if self.dynamics_list[mode].type == 'continuous':
                 x = np.ndarray.flatten(
                     np.dot(current_linsys.A * step_size + np.eye(current_linsys.A.shape[0]), state)) + \

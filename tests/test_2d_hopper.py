@@ -52,11 +52,11 @@ def test_pushoff_hopper():
     initial_state = np.asarray([0.5, 1, 0, 0, 5, 0, 0., 0., 0., 0.])
     hopper = Hopper_2d(initial_state=initial_state)
     # simulate the hopper
-    state_count = 10000
+    state_count = 1000
     states = np.zeros([10, state_count])
     states[:, 0] = initial_state
     end_count = None
-    step_size = 1e-3
+    step_size = 1e-2
     i = 0
     try:
         for i in range(1,state_count):
@@ -67,13 +67,8 @@ def test_pushoff_hopper():
             #     f = 500
             # elif states[4,i-1]<0 or states[4,i-1]>15:
             #     f = -100*(states[4,i-1]-initial_state[4])-1*states[9,i-1]
-            if states[9,i-1]<0:
-                u = np.asarray([0,40])
-            elif states[9,i-1]>=0:
-                u = np.asarray([0,300])
-            else:
-                raise Exception
-                u = np.asarray([0, 0])
+            if states[9,i-1]>=0:
+                u = np.asarray([0,80])
             states[:, i] = hopper.forward_step(step_size=step_size, u=u)
             # print(states[:,i])
             if i%100==0 or hopper.was_in_contact:
