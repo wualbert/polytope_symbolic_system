@@ -203,7 +203,7 @@ class Hopper_2d(DTHybridSystem):
             if (state[1]-self.ground_height_function(state[0])<self.step_size_switch_threshold and state[6]<0) or\
                     (state[1]-self.ground_height_function(state[0])<=0):
                 variable_step_size = self.contact_step_size
-            elif self.step_size_switch_threshold>t and state[6]<0:
+            elif self.flight_step_size>1.2*t and state[6]<0:
                 print('decreasing step size')
                 variable_step_size=max(self.contact_step_size, 0.8*t)
             else:
