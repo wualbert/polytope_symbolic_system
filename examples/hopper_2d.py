@@ -4,7 +4,7 @@ from common.symbolic_system import *
 
 class Hopper_2d(DTHybridSystem):
     def __init__(self, m=5, J=10, m_l=1, J_l=1, l1=0.0, l2=0.0, k_g=1e3, b_g=100,\
-                 g=9.8, flight_step_size = 1e-1, contact_step_size = 1e-2, step_size_switch_threshold=1e-1,\
+                 g=9.8, flight_step_size = 1e-1, contact_step_size = 1e-2, step_size_switch_threshold=2e-2,\
                  ground_height_function=lambda x: 0, initial_state=np.asarray([0.,0.,0.,1.5,1.0,0.,0.,0.,0.,0.])):
 
 
@@ -199,9 +199,13 @@ class Hopper_2d(DTHybridSystem):
             #     print('A', current_linsys.A)
             # print('B', current_linsys.B)
             #     print('c', current_linsys.c)
+            t = ((state[6]**2+2*self.g*abs(state[1]-self.ground_height_function(state[0])))**0.5-abs(state[6]))/self.g
             if (state[1]-self.ground_height_function(state[0])<self.step_size_switch_threshold and state[6]<0) or\
-                    (state[1]-self.ground_height_function(state[0])<1e-3):
+                    (state[1]-self.ground_height_function(state[0])<=0):
                 variable_step_size = self.contact_step_size
+            elif self.step_size_switch_threshold>t and state[6]<0:
+                print('decreasing step size')
+                variable_step_size=max(self.contact_step_size, 0.8*t)
             else:
                 variable_step_size = self.flight_step_size
             if self.dynamics_list[mode].type == 'continuous':
