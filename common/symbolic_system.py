@@ -235,7 +235,7 @@ class DTHybridSystem:
         #TODO
 
     def do_internal_updates(self):
-        pass
+        raise NotImplementedError
 
     def forward_step(self, u=None, linearlize=False, modify_system=True, step_size = 1e-3, return_as_env = False,
                      return_mode = False, starting_state=None):

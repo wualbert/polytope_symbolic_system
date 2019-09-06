@@ -1,10 +1,11 @@
 import pydrake.symbolic as sym
 import numpy as np
-from common.symbolic_system import DTHybridSystem, in_mode, extract_variable_value_from_env
+from common.symbolic_system import *
 
 class Hopper_2d(DTHybridSystem):
     def __init__(self, m=10, J=10, m_l=1, J_l=1, l1=0.0, l2=0.0, k_g=1e3, b_g=90,\
-                 g=9.8, ground_height_function=lambda x: 0, initial_state=np.asarray([0.,0.,0.,1.5,1.0,0.,0.,0.,0.,0.])):
+                 g=9.8, flight_step_size = 1e-1, contact_step_size = 1e-2, step_size_switch_threshold=1e-1,\
+                 ground_height_function=lambda x: 0, initial_state=np.asarray([0.,0.,0.,1.5,1.0,0.,0.,0.,0.,0.])):
 
 
         '''
@@ -40,6 +41,9 @@ class Hopper_2d(DTHybridSystem):
             self.initial_env[self.x[i]]=state
         self.initial_env[self.xTD] = 0
         self.k0 = 300
+        self.flight_step_size = flight_step_size
+        self.contact_step_size = contact_step_size
+        self.step_size_switch_threshold = step_size_switch_threshold
         # print(self.initial_env)
 
         # Dynamic modes
@@ -163,6 +167,68 @@ class Hopper_2d(DTHybridSystem):
         env[self.xTD] = state[0]
         return env
 
+    def get_reachable_polytopes(self, state, step_size=1e-2, use_convex_hull=True):
+        polytopes_list = []
+        for mode, c_i in enumerate(self.c_list):
+            # FIXME: better way to check if the mode is possible
+            # Very naive check: if all-min and all-max input lead to not being in mode, assume state is not in mode
+            lower_bound_env = self.env.copy()
+            upper_bound_env = self.env.copy()
+            unactuated_env = self.env.copy()
+            for i, u_i in enumerate(self.u):
+                lower_bound_env[u_i] = self.input_limits[0,i]
+                upper_bound_env[u_i] = self.input_limits[1, i]
+                unactuated_env[u_i] = 0
+            for i, x_i in enumerate(self.x):
+                lower_bound_env[x_i] = state[i]
+                upper_bound_env[x_i] = state[i]
+                unactuated_env[x_i] = state[i]
+
+            if (not in_mode(c_i, lower_bound_env)) and (not in_mode(c_i, upper_bound_env)) and not in_mode(c_i, unactuated_env):
+                # print('dropping mode %i' %mode)
+                continue
+
+            current_linsys = self.get_linearization(state, mode)
+            if current_linsys is None:
+                # this should not happen?
+                raise Exception
+            u_bar = (self.input_limits[1, :] + self.input_limits[0, :]) / 2
+            u_diff = (self.input_limits[1, :] - self.input_limits[0, :]) / 2
+            # print(mode)
+            #     print('A', current_linsys.A)
+            # print('B', current_linsys.B)
+            #     print('c', current_linsys.c)
+            if state[1]-self.ground_height_function(state[0])<self.step_size_switch_threshold:
+                variable_step_size = self.contact_step_size
+            else:
+                variable_step_size = self.flight_step_size
+            if self.dynamics_list[mode].type == 'continuous':
+                x = np.ndarray.flatten(
+                    np.dot(current_linsys.A * variable_step_size + np.eye(current_linsys.A.shape[0]), state)) + \
+                    np.dot(current_linsys.B * variable_step_size, u_bar) + np.ndarray.flatten(current_linsys.c * variable_step_size)
+                x = np.atleast_2d(x).reshape(-1, 1)
+                assert (len(x) == len(state))
+                G = np.atleast_2d(np.dot(current_linsys.B * variable_step_size, np.diag(u_diff)))
+
+            elif self.dynamics_list[mode].type == 'discrete':
+                x = np.ndarray.flatten(
+                    np.dot(current_linsys.A, state)) + \
+                    np.dot(current_linsys.B, u_bar) + np.ndarray.flatten(current_linsys.c)
+                x = np.atleast_2d(x).reshape(-1, 1)
+                assert (len(x) == len(state))
+                G = np.atleast_2d(np.dot(current_linsys.B, np.diag(u_diff)))
+                # print('x', x)
+                # print('G', G)
+            else:
+                raise ValueError
+            # if mode==1:
+            #     print(G, x)
+            if use_convex_hull:
+                polytopes_list.append(convex_hull_of_point_and_polytope(x, zonotope(x,G)))
+            else:
+                polytopes_list.append(to_AH_polytope(zonotope(x, G)))
+        return np.asarray(polytopes_list)
+
     def forward_step(self, u=None, linearlize=False, modify_system=True, step_size = 1e-3, return_as_env = False,
                      return_mode = False, starting_state=None):
         if starting_state is not None:
@@ -186,14 +252,20 @@ class Hopper_2d(DTHybridSystem):
             if not is_in_mode:
                 continue
             if self.dynamics_list[i].type == 'continuous':
-                delta_x = self.dynamics_list[i].evaluate_xdot(new_env, linearlize)*step_size
+                # use small step for contact
+                if new_env[self.x[1]]<2e-1:
+                    variable_step_size = 1e-2
+                else:
+                    variable_step_size = 1e-1
+                print(variable_step_size)
+                delta_x = self.dynamics_list[i].evaluate_xdot(new_env, linearlize)*variable_step_size
             elif self.dynamics_list[i].type == 'discrete':
                 x_new = self.dynamics_list[i].evaluate_x_next(new_env, linearlize)
             else:
                 raise ValueError
             mode = i
             break
-        assert(mode != -1) # The system should always be in one mode
+        # assert(mode != -1) # The system should always be in one mode
         # print('mode', mode)
         # print(self.env)
         #FIXME: check if system is in 2 modes (illegal)
