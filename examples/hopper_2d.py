@@ -3,8 +3,8 @@ import numpy as np
 from common.symbolic_system import *
 
 class Hopper_2d(DTHybridSystem):
-    def __init__(self, m=10, J=10, m_l=1, J_l=1, l1=0.0, l2=0.0, k_g=1e3, b_g=90,\
-                 g=9.8, flight_step_size = 1e-1, contact_step_size = 1e-2, step_size_switch_threshold=1e-1,\
+    def __init__(self, m=5, J=10, m_l=1, J_l=1, l1=0.0, l2=0.0, k_g=1e3, b_g=100,\
+                 g=9.8, flight_step_size = 1e-1, contact_step_size = 1e-2, step_size_switch_threshold=5e-2,\
                  ground_height_function=lambda x: 0, initial_state=np.asarray([0.,0.,0.,1.5,1.0,0.,0.,0.,0.,0.])):
 
 
@@ -40,7 +40,8 @@ class Hopper_2d(DTHybridSystem):
         for i, state in enumerate(initial_state):
             self.initial_env[self.x[i]]=state
         self.initial_env[self.xTD] = 0
-        self.k0 = 300
+        self.k0 = 120
+        self.k0_flight = 5
         self.flight_step_size = flight_step_size
         self.contact_step_size = contact_step_size
         self.step_size_switch_threshold = step_size_switch_threshold
@@ -68,7 +69,7 @@ class Hopper_2d(DTHybridSystem):
         d4 = -self.m*R*sym.cos(self.x[2])
         e1 = self.J_l*self.l2*sym.cos(self.x[2]-self.x[3])
         e2 = -self.J*R
-        F_leg_flight = -20*(self.x[4]-self.r0)-self.b_leg*3*self.x[9]
+        F_leg_flight = -self.k0_flight*(self.x[4]-self.r0)-self.b_leg*3*self.x[9]
         F_leg_ascend = -self.k0*(self.x[4]-self.r0)-self.b_leg*self.x[9]
         F_leg_descend = -self.u[1]*(self.x[4]-self.r0)-self.b_leg*self.x[9]
         def get_ddots(Fx, Fy, F_leg, u0):
@@ -257,7 +258,6 @@ class Hopper_2d(DTHybridSystem):
                     variable_step_size = 1e-2
                 else:
                     variable_step_size = 1e-1
-                print(variable_step_size)
                 delta_x = self.dynamics_list[i].evaluate_xdot(new_env, linearlize)*variable_step_size
             elif self.dynamics_list[i].type == 'discrete':
                 x_new = self.dynamics_list[i].evaluate_x_next(new_env, linearlize)
