@@ -3,8 +3,8 @@ import numpy as np
 from common.symbolic_system import *
 
 class Hopper_2d(DTHybridSystem):
-    def __init__(self, m=5, J=100, m_l=1, J_l=0.5, l1=0.0, l2=0.0, k_g=2e3, b_g=40, \
-                 g=9.8, flight_step_size = 4e-2, contact_step_size = 3e-2, descend_step_size_switch_threshold=2e-2, \
+    def __init__(self, m=5, J=100, m_l=1, J_l=0.1, l1=0.0, l2=0.0, k_g=2e3, b_g=40, \
+                 g=9.8, flight_step_size = 4e-2, contact_step_size = 2e-2, descend_step_size_switch_threshold=2e-2, \
                  ground_height_function=lambda x: 0, initial_state=np.asarray([0.,0.,0.,1.5,1.0,0.,0.,0.,0.,0.])):
 
 
@@ -81,14 +81,14 @@ class Hopper_2d(DTHybridSystem):
         F_leg_descend = -self.k0*r_diff_upper-self.b_leg*self.x[9]
         # F_leg_descend = F_leg_ascend
 
-        self.tau_p = 5
-        self.tau_d = 1
-        hip_x_dot = self.x[5]-self.x[9]*sym.sin(self.x[2])-self.x[4]*sym.cos(self.x[2])*self.x[7]
-        hip_y_dot = self.x[6]-self.x[9]*sym.cos(self.x[2])+self.x[4]*sym.cos(self.x[2])*self.x[7]
-        alpha_des_ascend = 0#-sym.atan(self.x[5]/self.x[6]) # point toward
-        alpha_des_descend = -sym.atan(hip_x_dot/(hip_y_dot+1e-6)) # point toward landing point
-        tau_leg_flight_ascend = self.tau_p*(alpha_des_ascend-self.x[2])-self.tau_d*self.x[8]
-        tau_leg_flight_descend = self.tau_p*(alpha_des_descend-self.x[2])-self.tau_d*self.x[8]
+        self.tau_p = 80
+        self.tau_d = 0
+        hip_x_dot = self.x[5]+self.x[9]*sym.sin(self.x[2])+self.x[4]*sym.cos(self.x[2])*self.x[7]
+        hip_y_dot = self.x[6]+self.x[9]*sym.cos(self.x[2])-self.x[4]*sym.sin(self.x[2])*self.x[7]
+        alpha_des_ascend = sym.atan(hip_x_dot/(-hip_y_dot-1e-9))#-sym.atan(self.x[5]/self.x[6]) # point toward
+        alpha_des_descend = sym.atan(hip_x_dot/(hip_y_dot+1e-9)) # point toward landing point
+        tau_leg_flight_ascend = (self.tau_p*(alpha_des_ascend-self.x[2])-self.tau_d*self.x[7])*-1
+        tau_leg_flight_descend = (self.tau_p*(alpha_des_descend-self.x[2])-self.tau_d*self.x[7])*-1
         tau_leg_contact = self.u[0]
 
         def get_ddots(Fx, Fy, F_leg, u0):
@@ -110,8 +110,8 @@ class Hopper_2d(DTHybridSystem):
         contact_descend_dynamics = np.hstack((self.x[5:], get_ddots(Fx_contact, Fy_contact, F_leg_descend, tau_leg_contact)))
         contact_ascend_dynamics = np.hstack((self.x[5:], get_ddots(Fx_contact, Fy_contact, F_leg_ascend, tau_leg_contact)))
 
-        flight_ascend_conditions = np.asarray([self.x[1] > self.ground_height_function(self.x[0]), self.x[6]>0])
-        flight_descend_conditions = np.asarray([self.x[1] > self.ground_height_function(self.x[0]), self.x[6]<=0])
+        flight_ascend_conditions = np.asarray([self.x[1] > self.ground_height_function(self.x[0]), hip_y_dot>0])
+        flight_descend_conditions = np.asarray([self.x[1] > self.ground_height_function(self.x[0]), hip_y_dot<=0])
         contact_descend_coditions = np.asarray([self.x[1] <= self.ground_height_function(self.x[0]), self.x[9] < 0])
         contact_ascend_coditions = np.asarray([self.x[1] <= self.ground_height_function(self.x[0]), self.x[9] >= 0])
 
@@ -120,7 +120,7 @@ class Hopper_2d(DTHybridSystem):
         self.c_list = np.asarray([flight_ascend_conditions, flight_descend_conditions, contact_descend_coditions, contact_ascend_coditions])
 
         DTHybridSystem.__init__(self, self.f_list, self.f_type_list, self.x, self.u, self.c_list, \
-                                self.initial_env, input_limits=np.vstack([[-50,10], [50,160]]))
+                                self.initial_env, input_limits=np.vstack([[-500,10], [500,160]]))
 
     def get_cg_coordinate_states(self, env = None):
         """
