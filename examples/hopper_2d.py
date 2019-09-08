@@ -3,7 +3,7 @@ import numpy as np
 from common.symbolic_system import *
 
 class Hopper_2d(DTHybridSystem):
-    def __init__(self, m=5, J=10, m_l=1, J_l=.1, l1=0.0, l2=0.0, k_g=4e3, b_g=80, \
+    def __init__(self, m=5, J=100, m_l=1, J_l=0.5, l1=0.0, l2=0.0, k_g=4e3, b_g=80, \
                  g=9.8, flight_step_size = 3e-2, contact_step_size = 2e-2, descend_step_size_switch_threshold=2e-2, \
                  ground_height_function=lambda x: 0, initial_state=np.asarray([0.,0.,0.,1.5,1.0,0.,0.,0.,0.,0.])):
 
@@ -20,11 +20,11 @@ class Hopper_2d(DTHybridSystem):
         self.l2 = l2
         self.k_g_y = k_g
         self.k_g_x = 2e3
-        self.b_g_x = 80
+        self.b_g_x = 60
         self.b_g = b_g
         self.g = g
         self.ground_height_function = ground_height_function
-        self.r0 = 5
+        self.r0 = 4
         self.b_leg = 2
         # state machine for touchdown detection
         self.xTD = sym.Variable('xTD')
