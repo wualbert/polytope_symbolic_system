@@ -3,8 +3,8 @@ import numpy as np
 from common.symbolic_system import *
 
 class Hopper_2d(DTHybridSystem):
-    def __init__(self, m=5, J=10, m_l=1, J_l=1, l1=0.0, l2=0.0, k_g=1e3, b_g=100,\
-                 g=9.8, flight_step_size = 1e-1, contact_step_size = 1e-2, step_size_switch_threshold=2e-2,\
+    def __init__(self, m=5, J=10, m_l=1, J_l=1, l1=0.0, l2=0.0, k_g=4e3, b_g=80, \
+                 g=9.8, flight_step_size = 5e-2, contact_step_size = 2e-2, descend_step_size_switch_threshold=2e-2, \
                  ground_height_function=lambda x: 0, initial_state=np.asarray([0.,0.,0.,1.5,1.0,0.,0.,0.,0.,0.])):
 
 
@@ -18,12 +18,13 @@ class Hopper_2d(DTHybridSystem):
         self.J_l = J_l
         self.l1 = l1
         self.l2 = l2
-        self.k_g = k_g
+        self.k_g_y = k_g
+        self.k_g_x = 2e3
         self.b_g = b_g
         self.g = g
         self.ground_height_function = ground_height_function
         self.r0 = 5
-        self.b_leg = 0
+        self.b_leg = 2
         # state machine for touchdown detection
         self.xTD = sym.Variable('xTD')
         self.was_in_contact = False
@@ -40,17 +41,20 @@ class Hopper_2d(DTHybridSystem):
         for i, state in enumerate(initial_state):
             self.initial_env[self.x[i]]=state
         self.initial_env[self.xTD] = 0
-        self.k0 = 120
-        self.k0_flight = 5
+        self.k0 = 100
+        self.k0_stabilize = 2
+        self.k0_restore = 30
+        self.b0_restore = 8
         self.flight_step_size = flight_step_size
         self.contact_step_size = contact_step_size
-        self.step_size_switch_threshold = step_size_switch_threshold
+        self.descend_step_size_switch_threshold = descend_step_size_switch_threshold
+        self.hover_step_size_switch_threshold=-0.75
         # print(self.initial_env)
 
         # Dynamic modes
-        Fx_contact = -self.k_g*(self.x[0]-self.xTD)-self.b_g*self.x[5]
+        Fx_contact = -self.k_g_x*(self.x[0]-self.xTD)-self.b_g*self.x[5]
         Fx_flight = 0.
-        Fy_contact = -self.k_g*(self.x[1]-self.ground_height_function(self.x[0]))-self.b_g*self.x[6]
+        Fy_contact = -self.k_g_y*(self.x[1]-self.ground_height_function(self.x[0]))-self.b_g*self.x[6]
         Fy_flight = 0.
 
         R = self.x[4]-self.l1
@@ -69,9 +73,13 @@ class Hopper_2d(DTHybridSystem):
         d4 = -self.m*R*sym.cos(self.x[2])
         e1 = self.J_l*self.l2*sym.cos(self.x[2]-self.x[3])
         e2 = -self.J*R
-        F_leg_flight = -self.k0_flight*(self.x[4]-self.r0)-self.b_leg*3*self.x[9]
-        F_leg_ascend = -self.k0*(self.x[4]-self.r0)-self.b_leg*self.x[9]
-        F_leg_descend = -self.u[1]*(self.x[4]-self.r0)-self.b_leg*self.x[9]
+        r_diff_upper = self.x[4]-(self.r0+1)
+        r_diff_lower = self.x[4]-(self.r0)
+        F_leg_flight = -self.k0_restore*r_diff_upper-self.b0_restore*self.x[9]
+        F_leg_ascend = self.u[1] * (1-np.exp(30*r_diff_upper)/(np.exp(30*r_diff_upper)+1))+(- self.k0_stabilize * r_diff_lower - self.b_leg * self.x[9])*(np.exp(30*r_diff_upper)/(np.exp(30*r_diff_upper)+1))
+        F_leg_descend = -self.k0*(self.x[4]-self.r0)-self.b_leg*self.x[9]
+        # F_leg_descend = F_leg_ascend
+
         def get_ddots(Fx, Fy, F_leg, u0):
             alpha = (self.l1*Fy*sym.sin(self.x[2])-self.l1*Fx*sym.cos(self.x[2])-u0)
             A = sym.cos(self.x[2])*alpha-R*(Fx-F_leg*sym.sin(self.x[2])-self.m_l*self.l1*self.x[7]**2*sym.sin(self.x[2]))
@@ -99,7 +107,7 @@ class Hopper_2d(DTHybridSystem):
         self.c_list = np.asarray([flight_conditions, contact_descend_coditions, contact_ascend_coditions])
 
         DTHybridSystem.__init__(self, self.f_list, self.f_type_list, self.x, self.u, self.c_list, \
-                                self.initial_env, input_limits=np.vstack([[-10,10], [10,self.k0-1]]))
+                                self.initial_env, input_limits=np.vstack([[-10,10], [10,120]]))
 
     def get_cg_coordinate_states(self, env = None):
         """
@@ -200,12 +208,23 @@ class Hopper_2d(DTHybridSystem):
             # print('B', current_linsys.B)
             #     print('c', current_linsys.c)
             t = ((state[6]**2+2*self.g*abs(state[1]-self.ground_height_function(state[0])))**0.5-abs(state[6]))/self.g
-            if (state[1]-self.ground_height_function(state[0])<self.step_size_switch_threshold and state[6]<0) or\
-                    (state[1]-self.ground_height_function(state[0])<=0):
+            # print((0>=state[1]-self.ground_height_function(state[0])>=self.hover_step_size_switch_threshold),state[6])
+
+            if (0>=state[1]-self.ground_height_function(state[0])>=self.hover_step_size_switch_threshold):# and abs(state[6])<0.7:
+                variable_step_size=min(max(self.contact_step_size, (0.65-state[4])/state[9]), self.flight_step_size)
+                # print(variable_step_size)
+            elif (0<state[1] - self.ground_height_function(state[0]) < self.descend_step_size_switch_threshold and state[6] < 0) or\
+                    (state[1]-self.ground_height_function(state[0])<=self.hover_step_size_switch_threshold):
+                #descending to ground
+                # if emerging from the ground, decrease step size further
+                # print((0.05-(state[1]-self.ground_height_function(state[0])))/state[6]))
+                # variable_step_size = max(min(self.contact_step_size, (0.05-(state[1]-self.ground_height_function(state[0])))/state[6]), 1e-3)
                 variable_step_size = self.contact_step_size
-            elif self.flight_step_size>1.2*t and state[6]<0:
-                print('decreasing step size')
-                variable_step_size=max(self.contact_step_size, 0.8*t)
+                # print('using contact step size')
+            elif self.flight_step_size>1.2*t and state[6]<0 and (state[1]-self.ground_height_function(state[0])>0.):
+                # descending in flight
+                variable_step_size=max(self.contact_step_size, t)
+                # print('using adaptive flight step size', variable_step_size)
             else:
                 variable_step_size = self.flight_step_size
             if self.dynamics_list[mode].type == 'continuous':

@@ -129,8 +129,10 @@ class DTContinuousSystem:
         else:
             self.input_limits = input_limits
 
-    def forward_step(self, u=None, linearlize=False, modify_system=True, step_size = 1e-3, return_as_env = False):
-        if not modify_system:
+    def forward_step(self, u=None, linearlize=False, modify_system=True, step_size = 1e-3, return_as_env = False, starting_state=None):
+        if starting_state is not None:
+            new_env = self._state_to_env(starting_state, u)
+        elif not modify_system:
             new_env = self.env.copy()
         else:
             new_env = self.env
@@ -235,7 +237,7 @@ class DTHybridSystem:
         #TODO
 
     def do_internal_updates(self):
-        raise NotImplementedError
+        pass
 
     def forward_step(self, u=None, linearlize=False, modify_system=True, step_size = 1e-3, return_as_env = False,
                      return_mode = False, starting_state=None):
