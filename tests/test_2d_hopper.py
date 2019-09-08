@@ -102,6 +102,62 @@ def test_pushoff_hopper():
 
     plt.show()
 
+def test_moving_hopper():
+    initial_state = np.asarray([0.5, 1, 0, 0, 5, 0.5, 0., 0., 0., 0.])
+    hopper = Hopper_2d(initial_state=initial_state)
+    # simulate the hopper
+    state_count = 1000
+    states = np.zeros([10, state_count])
+    states[:, 0] = initial_state
+    end_count = None
+    step_size = 1e-2
+    i = 0
+    try:
+        for i in range(1,state_count):
+            if i%10000==0:
+                print('iteration %i' %i)
+            # foot length controller
+            f = 0
+            alpha_des = -np.arctan(states[5,i-1]/states[6,i-1])
+            print(alpha_des)
+            if states[1, i-1]<=0 and states[4,i-1]>0 and states[4,i-1]<15:
+                f = (states[3, i-1]-alpha_des)
+            # elif states[4,i-1]<0 or states[4,i-1]>15:
+            #     f = -100*(states[4,i-1]-initial_state[4])-1*states[9,i-1]
+            # ascending
+            if states[9,i-1]>=0:
+                u = np.asarray([f,120])#300
+            else:
+                u = np.asarray([f, 60])  # 300
+            states[:, i] = hopper.forward_step(step_size=step_size, u=u)
+            # print(states[:,i])
+            if i%100==0 or hopper.was_in_contact:
+                print(hopper.env[hopper.xTD]-hopper.env[hopper.x[0]], hopper.env[hopper.x[1]], hopper.was_in_contact)
+    except Exception as e:
+        print("Simulation terminated due to exception: %s" %e)
+        end_count = i
+        print('Simulation terminated at step %i' %i)
+        print('Env is:', hopper.get_current_state())
+    # plot the Raibert coordinate states
+    fig1, ax1 = plt.subplots(5,1)
+    labels1 = ['$x_{ft}$', '$y_{ft}$', '$\\theta$', '$\\phi$', 'r']
+    for i in range(5):
+        ax1[i].plot(states[i,0:end_count])
+        ax1[i].set_xlabel('Steps')
+        ax1[i].set_ylabel(labels1[i])
+    ax1[1].set_ylim([0,2])
+    ax1[4].set_ylim([0,2])
+
+    fig3, ax3 = plt.subplots(5,1)
+    labels3 = ['$\\dot{x_{ft}}$', '$\\dot{y_{ft}}$', '$\\dot{\\theta}$', '$\\dot{\\phi}$', '$\\dot{r}$']
+    for i in range(5):
+        ax3[i].plot(states[i+5,1:end_count])
+        ax3[i].set_xlabel('Steps')
+        ax3[i].set_ylabel(labels3[i])
+    ax3[1].set_ylim([-6,6])
+    ax3[4].set_ylim([-6,6])
+
+    plt.show()
 
 def test_raibert_controller_hopper(desired_lateral_velocity=0.0):
     initial_state = np.asarray([0.,0.,15.,1.,0.8,0.,0.,0.,0.,0.])
@@ -194,4 +250,4 @@ def test_raibert_controller_hopper(desired_lateral_velocity=0.0):
     plt.show()
 
 if __name__=='__main__':
-    test_pushoff_hopper()
+    test_moving_hopper()
