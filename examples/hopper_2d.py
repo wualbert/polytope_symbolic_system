@@ -3,8 +3,8 @@ import numpy as np
 from common.symbolic_system import *
 
 class Hopper_2d(DTHybridSystem):
-    def __init__(self, m=5, J=100, m_l=1, J_l=0.5, l1=0.0, l2=0.0, k_g=4e3, b_g=80, \
-                 g=9.8, flight_step_size = 3e-2, contact_step_size = 2e-2, descend_step_size_switch_threshold=2e-2, \
+    def __init__(self, m=5, J=100, m_l=1, J_l=0.5, l1=0.0, l2=0.0, k_g=2e3, b_g=40, \
+                 g=9.8, flight_step_size = 4e-2, contact_step_size = 3e-2, descend_step_size_switch_threshold=2e-2, \
                  ground_height_function=lambda x: 0, initial_state=np.asarray([0.,0.,0.,1.5,1.0,0.,0.,0.,0.,0.])):
 
 
@@ -20,7 +20,7 @@ class Hopper_2d(DTHybridSystem):
         self.l2 = l2
         self.k_g_y = k_g
         self.k_g_x = 2e3
-        self.b_g_x = 60
+        self.b_g_x = 40
         self.b_g = b_g
         self.g = g
         self.ground_height_function = ground_height_function
@@ -108,7 +108,7 @@ class Hopper_2d(DTHybridSystem):
         self.c_list = np.asarray([flight_conditions, contact_descend_coditions, contact_ascend_coditions])
 
         DTHybridSystem.__init__(self, self.f_list, self.f_type_list, self.x, self.u, self.c_list, \
-                                self.initial_env, input_limits=np.vstack([[-80,10], [80,120]]))
+                                self.initial_env, input_limits=np.vstack([[-50,10], [50,160]]))
 
     def get_cg_coordinate_states(self, env = None):
         """
