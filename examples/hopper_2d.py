@@ -3,8 +3,8 @@ import numpy as np
 from common.symbolic_system import *
 
 class Hopper_2d(DTHybridSystem):
-    def __init__(self, m=5, J=10, m_l=1, J_l=1, l1=0.0, l2=0.0, k_g=4e3, b_g=80, \
-                 g=9.8, flight_step_size = 5e-2, contact_step_size = 2e-2, descend_step_size_switch_threshold=2e-2, \
+    def __init__(self, m=5, J=10, m_l=1, J_l=.1, l1=0.0, l2=0.0, k_g=4e3, b_g=80, \
+                 g=9.8, flight_step_size = 3e-2, contact_step_size = 2e-2, descend_step_size_switch_threshold=2e-2, \
                  ground_height_function=lambda x: 0, initial_state=np.asarray([0.,0.,0.,1.5,1.0,0.,0.,0.,0.,0.])):
 
 
@@ -20,6 +20,7 @@ class Hopper_2d(DTHybridSystem):
         self.l2 = l2
         self.k_g_y = k_g
         self.k_g_x = 2e3
+        self.b_g_x = 80
         self.b_g = b_g
         self.g = g
         self.ground_height_function = ground_height_function
@@ -52,7 +53,7 @@ class Hopper_2d(DTHybridSystem):
         # print(self.initial_env)
 
         # Dynamic modes
-        Fx_contact = -self.k_g_x*(self.x[0]-self.xTD)-self.b_g*self.x[5]
+        Fx_contact = -self.k_g_x*(self.x[0]-self.xTD)-self.b_g_x*self.x[5]
         Fx_flight = 0.
         Fy_contact = -self.k_g_y*(self.x[1]-self.ground_height_function(self.x[0]))-self.b_g*self.x[6]
         Fy_flight = 0.
@@ -74,10 +75,10 @@ class Hopper_2d(DTHybridSystem):
         e1 = self.J_l*self.l2*sym.cos(self.x[2]-self.x[3])
         e2 = -self.J*R
         r_diff_upper = self.x[4]-(self.r0+1)
-        r_diff_lower = self.x[4]-(self.r0)
+        r_diff = self.x[4]-self.r0
         F_leg_flight = -self.k0_restore*r_diff_upper-self.b0_restore*self.x[9]
-        F_leg_ascend = self.u[1] * (1-np.exp(30*r_diff_upper)/(np.exp(30*r_diff_upper)+1))+(- self.k0_stabilize * r_diff_lower - self.b_leg * self.x[9])*(np.exp(30*r_diff_upper)/(np.exp(30*r_diff_upper)+1))
-        F_leg_descend = -self.k0*(self.x[4]-self.r0)-self.b_leg*self.x[9]
+        F_leg_ascend = self.u[1] * (1-np.exp(30*r_diff_upper)/(np.exp(30*r_diff_upper)+1))+(- self.k0_stabilize * r_diff - self.b_leg * self.x[9])*(np.exp(30*r_diff_upper)/(np.exp(30*r_diff_upper)+1))
+        F_leg_descend = -self.k0*r_diff_upper-self.b_leg*self.x[9]
         # F_leg_descend = F_leg_ascend
 
         def get_ddots(Fx, Fy, F_leg, u0):
@@ -107,7 +108,7 @@ class Hopper_2d(DTHybridSystem):
         self.c_list = np.asarray([flight_conditions, contact_descend_coditions, contact_ascend_coditions])
 
         DTHybridSystem.__init__(self, self.f_list, self.f_type_list, self.x, self.u, self.c_list, \
-                                self.initial_env, input_limits=np.vstack([[-10,10], [10,120]]))
+                                self.initial_env, input_limits=np.vstack([[-80,10], [80,120]]))
 
     def get_cg_coordinate_states(self, env = None):
         """
