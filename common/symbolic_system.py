@@ -162,7 +162,7 @@ class DTContinuousSystem:
         assert(len(x)==len(state))
         G = np.atleast_2d(np.dot(current_linsys.B*step_size, np.diag(u_diff)))
         if use_convex_hull:
-            return convex_hull_of_point_and_polytope(x,zonotope(x,G))
+            return convex_hull_of_point_and_polytope(state.reshape(x.shape),zonotope(x,G))
         return zonotope(x,G)
 
 
@@ -350,7 +350,7 @@ class DTHybridSystem:
             # if mode==1:
             #     print(G, x)
             if use_convex_hull:
-                polytopes_list.append(convex_hull_of_point_and_polytope(x, zonotope(x,G)))
+                polytopes_list.append(convex_hull_of_point_and_polytope(state.reshape(x.shape), zonotope(x,G)))
             else:
                 polytopes_list.append(to_AH_polytope(zonotope(x, G)))
         return np.asarray(polytopes_list)
