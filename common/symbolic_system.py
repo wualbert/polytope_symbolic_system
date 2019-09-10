@@ -223,16 +223,21 @@ class DTHybridSystem:
             else:
                 raise ValueError
         self.dynamics_list = np.asarray(dynamics_list)
-        if initial_env is None:
-            self.env = {}
-            for x_i in self.x:
-                self.env[x_i] = 0.
-        else:
-            self.env = initial_env
+
+        self.u_bar = (self.input_limits[1,:]+self.input_limits[0,:])/2.
+        self.u_diff =(self.input_limits[1,:]-self.input_limits[0,:])/2.
         if input_limits is None:
             self.input_limits = np.vstack([np.full(u.shape[0], -1e9),np.full(u.shape[0], 1e9)])
         else:
             self.input_limits = input_limits
+        if initial_env is None:
+            self.env = {}
+            for x_i in self.x:
+                self.env[x_i] = 0.
+            for i,u_i in enumerate(self.u):
+                self.env[u_i]=self.u_bar[i]
+        else:
+            self.env = initial_env
         self.c_list = c_list
         # Check the mode the system is in
         self.current_mode = -1
@@ -357,11 +362,11 @@ class DTHybridSystem:
                 polytopes_list.append(to_AH_polytope(zonotope(x, G)))
         return np.asarray(polytopes_list)
 
-    def get_linearization(self, state=None, mode=None):
+    def get_linearization(self, state=None, u_bar = None, mode=None):
         if state is None:
             return self.dynamics_list[self.current_mode].construct_linearized_system_at(self.env)
         else:
-            env = self._state_to_env(state)
+            env = self._state_to_env(state, u_bar)
             if mode is not None:
                 # FIXME: construct but don't ask questions?
                 # assert in_mode(self.c_list[mode], env)
