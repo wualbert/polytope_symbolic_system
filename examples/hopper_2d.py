@@ -3,8 +3,8 @@ import numpy as np
 from common.symbolic_system import *
 
 class Hopper_2d(DTHybridSystem):
-    def __init__(self, m=5, J=100, m_l=1, J_l=0.1, l1=0.0, l2=0.0, k_g=2e3, b_g=40, \
-                 g=9.8, flight_step_size = 4e-2, contact_step_size = 2e-2, descend_step_size_switch_threshold=2e-2, \
+    def __init__(self, m=5, J=100, m_l=1, J_l=0.5, l1=0.0, l2=0.0, k_g=1e3, b_g=20, \
+                 g=9.8, flight_step_size = 1e-2, contact_step_size = 5e-3, descend_step_size_switch_threshold=2e-2, \
                  ground_height_function=lambda x: 0, initial_state=np.asarray([0.,0.,0.,1.5,1.0,0.,0.,0.,0.,0.])):
 
 
@@ -19,13 +19,12 @@ class Hopper_2d(DTHybridSystem):
         self.l1 = l1
         self.l2 = l2
         self.k_g_y = k_g
-        self.k_g_x = 2e3
-        self.b_g_x = 40
+        self.k_g_x = 1e3
+        self.b_g_x = 20
         self.b_g = b_g
         self.g = g
         self.ground_height_function = ground_height_function
         self.r0 = 4
-        self.b_leg = 2
         # state machine for touchdown detection
         self.xTD = sym.Variable('xTD')
         self.was_in_contact = False
@@ -42,10 +41,12 @@ class Hopper_2d(DTHybridSystem):
         for i, state in enumerate(initial_state):
             self.initial_env[self.x[i]]=state
         self.initial_env[self.xTD] = 0
-        self.k0 = 100
-        self.k0_stabilize = 2
-        self.k0_restore = 30
-        self.b0_restore = 8
+        self.k0 = 500
+        self.b_leg = 2
+        self.k0_stabilize = 40
+        self.b0_stabilize = 10
+        self.k0_restore = 60
+        self.b0_restore = 15
         self.flight_step_size = flight_step_size
         self.contact_step_size = contact_step_size
         self.descend_step_size_switch_threshold = descend_step_size_switch_threshold
@@ -55,7 +56,7 @@ class Hopper_2d(DTHybridSystem):
         # Dynamic modes
         Fx_contact = -self.k_g_x*(self.x[0]-self.xTD)-self.b_g_x*self.x[5]
         Fx_flight = 0.
-        Fy_contact = -self.k_g_y*(self.x[1]-self.ground_height_function(self.x[0]))-self.b_g*self.x[6]
+        Fy_contact = -self.k_g_y*(self.x[1]-self.ground_height_function(self.x[0]))-self.b_g*self.x[6]*(1-np.exp(self.x[1]*16))
         Fy_flight = 0.
 
         R = self.x[4]-self.l1
@@ -74,19 +75,20 @@ class Hopper_2d(DTHybridSystem):
         d4 = -self.m*R*sym.cos(self.x[2])
         e1 = self.J_l*self.l2*sym.cos(self.x[2]-self.x[3])
         e2 = -self.J*R
-        r_diff_upper = self.x[4]-(self.r0+1)
+        r_diff_upper = self.x[4]-(self.r0+2)
+        self.b_r_ascend = 0
         r_diff = self.x[4]-self.r0
-        F_leg_flight = -self.k0_restore*r_diff_upper-self.b0_restore*self.x[9]
-        F_leg_ascend = self.u[1] * (1-np.exp(30*r_diff_upper)/(np.exp(30*r_diff_upper)+1))+(- self.k0_stabilize * r_diff - self.b_leg * self.x[9])*(np.exp(30*r_diff_upper)/(np.exp(30*r_diff_upper)+1))
-        F_leg_descend = -self.k0*r_diff_upper-self.b_leg*self.x[9]
+        F_leg_flight = -self.k0_restore*r_diff-self.b0_restore*self.x[9]
+        F_leg_ascend = -4e3*r_diff - self.b_r_ascend * self.x[9]#self.u[1] * (1-np.exp(10*r_diff_upper)/(np.exp(10*r_diff_upper)+1))#+(- self.k0_stabilize * r_diff_upper - self.b0_stabilize * self.x[9])*(np.exp(10*r_diff_upper)/(np.exp(10*r_diff_upper)+1))
+        F_leg_descend = -self.k0*r_diff-self.b_leg*self.x[9]
         # F_leg_descend = F_leg_ascend
 
-        self.tau_p = 80
-        self.tau_d = 0
+        self.tau_p = 250
+        self.tau_d = 10
         hip_x_dot = self.x[5]+self.x[9]*sym.sin(self.x[2])+self.x[4]*sym.cos(self.x[2])*self.x[7]
         hip_y_dot = self.x[6]+self.x[9]*sym.cos(self.x[2])-self.x[4]*sym.sin(self.x[2])*self.x[7]
-        alpha_des_ascend = sym.atan(hip_x_dot/(-hip_y_dot-1e-9))#-sym.atan(self.x[5]/self.x[6]) # point toward
-        alpha_des_descend = sym.atan(hip_x_dot/(hip_y_dot+1e-9)) # point toward landing point
+        alpha_des_ascend = 0.6*sym.atan(hip_x_dot/(-hip_y_dot-1e-9))#-sym.atan(self.x[5]/self.x[6]) # point toward
+        alpha_des_descend = 0.6*sym.atan(hip_x_dot/(hip_y_dot+1e-9)) # point toward landing point
         tau_leg_flight_ascend = (self.tau_p*(alpha_des_ascend-self.x[2])-self.tau_d*self.x[7])*-1
         tau_leg_flight_descend = (self.tau_p*(alpha_des_descend-self.x[2])-self.tau_d*self.x[7])*-1
         tau_leg_contact = self.u[0]
@@ -99,11 +101,11 @@ class Hopper_2d(DTHybridSystem):
             D = sym.sin(self.x[2])*alpha-R*(F_leg*sym.cos(self.x[2])-self.m*self.g)-self.m*R*(2*self.x[9]*self.x[7]*sym.sin(self.x[2])+self.x[4]*self.x[7]**2*sym.cos(self.x[2])+self.l2*self.x[8]**2*sym.cos(self.x[3]))
             E = self.l2*sym.cos(self.x[2]-self.x[3])*alpha-R*(self.l2*F_leg*sym.sin(self.x[3]-self.x[2])+u0)
 
-            return np.asarray([(A*b1*c2*d4*e2 - A*b1*c3*d4*e1 - A*b1*c4*d2*e2 + A*b1*c4*d3*e1 + A*b2*c4*d1*e2 - B*a2*c4*d1*e2 - C*a2*b1*d4*e2 + D*a2*b1*c4*e2 + E*a2*b1*c3*d4 - E*a2*b1*c4*d3)/(a1*b1*c2*d4*e2 - a1*b1*c3*d4*e1 - a1*b1*c4*d2*e2 + a1*b1*c4*d3*e1 + a1*b2*c4*d1*e2 - a2*b1*c1*d4*e2),\
-            (A*b2*c1*d4*e2 + B*a1*c2*d4*e2 - B*a1*c3*d4*e1 - B*a1*c4*d2*e2 + B*a1*c4*d3*e1 - B*a2*c1*d4*e2 - C*a1*b2*d4*e2 + D*a1*b2*c4*e2 + E*a1*b2*c3*d4 - E*a1*b2*c4*d3)/(a1*b1*c2*d4*e2 - a1*b1*c3*d4*e1 - a1*b1*c4*d2*e2 + a1*b1*c4*d3*e1 + a1*b2*c4*d1*e2 - a2*b1*c1*d4*e2),\
-            -(A*b1*c1*d4*e2 - B*a1*c4*d1*e2 - C*a1*b1*d4*e2 + D*a1*b1*c4*e2 + E*a1*b1*c3*d4 - E*a1*b1*c4*d3)/(a1*b1*c2*d4*e2 - a1*b1*c3*d4*e1 - a1*b1*c4*d2*e2 + a1*b1*c4*d3*e1 + a1*b2*c4*d1*e2 - a2*b1*c1*d4*e2),\
-            (A*b1*c1*d4*e1 - B*a1*c4*d1*e1 - C*a1*b1*d4*e1 + D*a1*b1*c4*e1 + E*a1*b1*c2*d4 - E*a1*b1*c4*d2 + E*a1*b2*c4*d1 - E*a2*b1*c1*d4)/(a1*b1*c2*d4*e2 - a1*b1*c3*d4*e1 - a1*b1*c4*d2*e2 + a1*b1*c4*d3*e1 + a1*b2*c4*d1*e2 - a2*b1*c1*d4*e2),\
-            (A*b1*c1*d2*e2 - A*b1*c1*d3*e1 - A*b2*c1*d1*e2 - B*a1*c2*d1*e2 + B*a1*c3*d1*e1 + B*a2*c1*d1*e2 - C*a1*b1*d2*e2 + C*a1*b1*d3*e1 + C*a1*b2*d1*e2 + D*a1*b1*c2*e2 - D*a1*b1*c3*e1 - D*a2*b1*c1*e2 - E*a1*b1*c2*d3 + E*a1*b1*c3*d2 - E*a1*b2*c3*d1 + E*a2*b1*c1*d3)/(a1*b1*c2*d4*e2 - a1*b1*c3*d4*e1 - a1*b1*c4*d2*e2 + a1*b1*c4*d3*e1 + a1*b2*c4*d1*e2 - a2*b1*c1*d4*e2)])
+            return np.asarray([(A*b1*c2*d4*e2 - A*b1*c3*d4*e1 - A*b1*c4*d2*e2 + A*b1*c4*d3*e1 + A*b2*c4*d1*e2 - B*a2*c4*d1*e2 - C*a2*b1*d4*e2 + D*a2*b1*c4*e2 + E*a2*b1*c3*d4 - E*a2*b1*c4*d3)/(a1*b1*c2*d4*e2 - a1*b1*c3*d4*e1 - a1*b1*c4*d2*e2 + a1*b1*c4*d3*e1 + a1*b2*c4*d1*e2 - a2*b1*c1*d4*e2), \
+                               (A*b2*c1*d4*e2 + B*a1*c2*d4*e2 - B*a1*c3*d4*e1 - B*a1*c4*d2*e2 + B*a1*c4*d3*e1 - B*a2*c1*d4*e2 - C*a1*b2*d4*e2 + D*a1*b2*c4*e2 + E*a1*b2*c3*d4 - E*a1*b2*c4*d3)/(a1*b1*c2*d4*e2 - a1*b1*c3*d4*e1 - a1*b1*c4*d2*e2 + a1*b1*c4*d3*e1 + a1*b2*c4*d1*e2 - a2*b1*c1*d4*e2), \
+                               -(A*b1*c1*d4*e2 - B*a1*c4*d1*e2 - C*a1*b1*d4*e2 + D*a1*b1*c4*e2 + E*a1*b1*c3*d4 - E*a1*b1*c4*d3)/(a1*b1*c2*d4*e2 - a1*b1*c3*d4*e1 - a1*b1*c4*d2*e2 + a1*b1*c4*d3*e1 + a1*b2*c4*d1*e2 - a2*b1*c1*d4*e2), \
+                               (A*b1*c1*d4*e1 - B*a1*c4*d1*e1 - C*a1*b1*d4*e1 + D*a1*b1*c4*e1 + E*a1*b1*c2*d4 - E*a1*b1*c4*d2 + E*a1*b2*c4*d1 - E*a2*b1*c1*d4)/(a1*b1*c2*d4*e2 - a1*b1*c3*d4*e1 - a1*b1*c4*d2*e2 + a1*b1*c4*d3*e1 + a1*b2*c4*d1*e2 - a2*b1*c1*d4*e2), \
+                               (A*b1*c1*d2*e2 - A*b1*c1*d3*e1 - A*b2*c1*d1*e2 - B*a1*c2*d1*e2 + B*a1*c3*d1*e1 + B*a2*c1*d1*e2 - C*a1*b1*d2*e2 + C*a1*b1*d3*e1 + C*a1*b2*d1*e2 + D*a1*b1*c2*e2 - D*a1*b1*c3*e1 - D*a2*b1*c1*e2 - E*a1*b1*c2*d3 + E*a1*b1*c3*d2 - E*a1*b2*c3*d1 + E*a2*b1*c1*d3)/(a1*b1*c2*d4*e2 - a1*b1*c3*d4*e1 - a1*b1*c4*d2*e2 + a1*b1*c4*d3*e1 + a1*b2*c4*d1*e2 - a2*b1*c1*d4*e2)])
 
         flight_ascend_dynamics = np.hstack((self.x[5:], get_ddots(Fx_flight, Fy_flight, F_leg_flight, tau_leg_flight_ascend)))
         flight_descend_dynamics = np.hstack((self.x[5:], get_ddots(Fx_flight, Fy_flight, F_leg_flight, tau_leg_flight_descend)))
@@ -120,7 +122,7 @@ class Hopper_2d(DTHybridSystem):
         self.c_list = np.asarray([flight_ascend_conditions, flight_descend_conditions, contact_descend_coditions, contact_ascend_coditions])
 
         DTHybridSystem.__init__(self, self.f_list, self.f_type_list, self.x, self.u, self.c_list, \
-                                self.initial_env, input_limits=np.vstack([[-500,10], [500,160]]))
+                                self.initial_env, input_limits=np.vstack([[-50,40], [50,160]]))
 
     def get_cg_coordinate_states(self, env = None):
         """

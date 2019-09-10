@@ -118,16 +118,21 @@ class DTContinuousSystem:
         :param input_limits: Input limits of the system
         '''
         self.dynamics = ContinuousDynamics(f,x,u)
-        if initial_env is None:
-            self.env = {}
-            for x_i in self.dynamics.x:
-                self.env[x_i] = 0
-        else:
-            self.env = initial_env
         if input_limits is None:
             self.input_limits = np.vstack([np.full(u.shape[0], -1e9),np.full(u.shape[0], 1e9)])
         else:
             self.input_limits = input_limits
+        self.u_bar = (self.input_limits[1,:]+self.input_limits[0,:])/2.
+        self.u_diff =(self.input_limits[1,:]-self.input_limits[0,:])/2.
+        if initial_env is None:
+            self.env = {}
+            for x_i in self.dynamics.x:
+                self.env[x_i] = 0.
+            for i,u_i in enumerate(self.dynamics.u):
+                self.env[u_i]=self.u_bar[i]
+        else:
+            self.env = initial_env
+
 
     def forward_step(self, u=None, linearlize=False, modify_system=True, step_size = 1e-3, return_as_env = False, starting_state=None):
         if starting_state is not None:
@@ -141,7 +146,7 @@ class DTContinuousSystem:
                 new_env[self.dynamics.u[i]] = min(max(u[i],self.input_limits[0,i]),self.input_limits[1,i])
         else:
             for i in range(self.dynamics.u.shape[0]):
-                new_env[self.dynamics.u[i]] = 0
+                new_env[self.dynamics.u[i]] = self.u_bar[i]
         delta_x = self.dynamics.evaluate_xdot(new_env, linearlize)*step_size
         #assign new xs
         for i in range(delta_x.shape[0]):
@@ -151,26 +156,23 @@ class DTContinuousSystem:
         else:
             return extract_variable_value_from_env(self.dynamics.x, new_env)
 
-    def get_reachable_polytopes(self, state, step_size = 1e-2, use_convex_hull=True):
-        current_linsys = self.get_linearization(state)
-        u_bar = (self.input_limits[1,:]+self.input_limits[0,:])/2
-        u_diff =(self.input_limits[1,:]-self.input_limits[0,:])/2
-        # print(current_linsys.A, current_linsys.B, current_linsys.c)
+    def get_reachable_polytopes(self, state, step_size = 1e-2, use_convex_hull=False):
+        current_linsys = self.get_linearization(state, self.u_bar)
         x = np.ndarray.flatten(np.dot(current_linsys.A*step_size+np.eye(current_linsys.A.shape[0]),state))+\
-            np.dot(current_linsys.B*step_size, u_bar)+np.ndarray.flatten(current_linsys.c*step_size)
+            np.dot(current_linsys.B*step_size, self.u_bar)+np.ndarray.flatten(current_linsys.c*step_size)
         x = np.atleast_2d(x).reshape(-1,1)
         assert(len(x)==len(state))
-        G = np.atleast_2d(np.dot(current_linsys.B*step_size, np.diag(u_diff)))
+        G = np.atleast_2d(np.dot(current_linsys.B*step_size, np.diag(self.u_diff)))
         if use_convex_hull:
             return convex_hull_of_point_and_polytope(state.reshape(x.shape),zonotope(x,G))
-        return zonotope(x,G)
+        return to_AH_polytope(zonotope(x,G))
 
 
-    def get_linearization(self, state=None):
+    def get_linearization(self, state=None, u_bar = None, mode=None):
         if state is None:
             return self.dynamics.construct_linearized_system_at(self.env)
         else:
-            env = self._state_to_env(state)
+            env = self._state_to_env(state, u_bar)
             return self.dynamics.construct_linearized_system_at(env)
 
     def _state_to_env(self, state, u=None):
@@ -179,8 +181,8 @@ class DTContinuousSystem:
         for i, s_i in enumerate(state):
             env[self.dynamics.x[i]] = s_i
         if u is None:
-            for u_i in self.dynamics.u:
-                env[u_i] = 0
+            for i, u_i in enumerate(self.dynamics.u):
+                env[u_i] = self.u_bar[i]
         else:
             for i, u_i in enumerate(u):
                 env[self.dynamics.u[i]] = u[i]
@@ -224,7 +226,7 @@ class DTHybridSystem:
         if initial_env is None:
             self.env = {}
             for x_i in self.x:
-                self.env[x_i] = 0
+                self.env[x_i] = 0.
         else:
             self.env = initial_env
         if input_limits is None:
@@ -252,7 +254,7 @@ class DTHybridSystem:
                 new_env[self.u[i]] = min(max(u[i],self.input_limits[0,i]),self.input_limits[1,i])
         else:
             for i in range(self.u.shape[0]):
-                new_env[self.u[i]] = 0
+                new_env[self.u[i]] = 0.
         # Check for which mode the system is in
         delta_x = None
         x_new = None
@@ -296,7 +298,7 @@ class DTHybridSystem:
         else:
             return extract_variable_value_from_env(self.x, new_env), mode
 
-    def get_reachable_polytopes(self, state, step_size=1e-2, use_convex_hull=True):
+    def get_reachable_polytopes(self, state, step_size=1e-2, use_convex_hull=False):
         polytopes_list = []
         for mode, c_i in enumerate(self.c_list):
             # FIXME: better way to check if the mode is possible
@@ -321,8 +323,8 @@ class DTHybridSystem:
             if current_linsys is None:
                 # this should not happen?
                 raise Exception
-            u_bar = (self.input_limits[1, :] + self.input_limits[0, :]) / 2
-            u_diff = (self.input_limits[1, :] - self.input_limits[0, :]) / 2
+            u_bar = (self.input_limits[1, :] + self.input_limits[0, :]) / 2.
+            u_diff = (self.input_limits[1, :] - self.input_limits[0, :]) / 2.
             # print(mode)
             #     print('A', current_linsys.A)
             # print('B', current_linsys.B)
@@ -377,7 +379,7 @@ class DTHybridSystem:
             env[self.x[i]] = s_i
         if u is None:
             for u_i in self.u:
-                env[u_i] = 0
+                env[u_i] = 0.
         else:
             for i, u_i in enumerate(u):
                 env[self.u[i]] = u[i]
