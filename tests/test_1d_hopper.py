@@ -41,6 +41,15 @@ def test_constant_input_hopper():
     plt.ylabel('$\dot{x}$')
     plt.show()
 
+def test_bang_bang_hopper():
+    initial_state = np.asarray([2.,0.])
+    l = 1
+    p = 0.1
+    step_size = 0.04
+    hopper_system = Hopper_1d(l=l, p=p, initial_state= initial_state, f_max=25)
+    goal_state = np.asarray([3,0.0])
+    goal_tolerance = 2e-2
+
 
 if __name__=='__main__':
     test_constant_input_hopper()

@@ -224,12 +224,12 @@ class DTHybridSystem:
                 raise ValueError
         self.dynamics_list = np.asarray(dynamics_list)
 
-        self.u_bar = (self.input_limits[1,:]+self.input_limits[0,:])/2.
-        self.u_diff =(self.input_limits[1,:]-self.input_limits[0,:])/2.
         if input_limits is None:
             self.input_limits = np.vstack([np.full(u.shape[0], -1e9),np.full(u.shape[0], 1e9)])
         else:
             self.input_limits = input_limits
+        self.u_bar = np.atleast_2d((self.input_limits[1,:]+self.input_limits[0,:])/2.)
+        self.u_diff = np.atleast_2d((self.input_limits[1,:]-self.input_limits[0,:])/2.)
         if initial_env is None:
             self.env = {}
             for x_i in self.x:
@@ -324,7 +324,7 @@ class DTHybridSystem:
                 # print('dropping mode %i' %mode)
                 continue
 
-            current_linsys = self.get_linearization(state, mode)
+            current_linsys = self.get_linearization(state, mode=mode)
             if current_linsys is None:
                 # this should not happen?
                 raise Exception
