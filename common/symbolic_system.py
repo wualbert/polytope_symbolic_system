@@ -259,7 +259,8 @@ class DTHybridSystem:
                 new_env[self.u[i]] = min(max(u[i],self.input_limits[0,i]),self.input_limits[1,i])
         else:
             for i in range(self.u.shape[0]):
-                new_env[self.u[i]] = 0.
+                #ensure u is scalar
+                new_env[self.u[i]] = np.ndarray.flatten(np.atleast_1d(self.u_bar[i]))[0]
         # Check for which mode the system is in
         delta_x = None
         x_new = None
@@ -383,8 +384,8 @@ class DTHybridSystem:
         for i, s_i in enumerate(state):
             env[self.x[i]] = s_i
         if u is None:
-            for u_i in self.u:
-                env[u_i] = 0.
+            for i, u_i in enumerate(self.u):
+                env[u_i] = self.u_bar[i]
         else:
             for i, u_i in enumerate(u):
                 env[self.u[i]] = u[i]

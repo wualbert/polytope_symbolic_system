@@ -2,6 +2,7 @@ from examples.pendulum import *
 import matplotlib
 import matplotlib.pyplot as plt
 matplotlib.rcParams['font.family'] = "Times New Roman"
+matplotlib.rcParams.update({'font.size': 16})
 
 def test_static_pendulum():
     pend = Pendulum(initial_state = np.array([np.pi/2,0]), b=0.2)
@@ -93,10 +94,12 @@ def test_bang_bang_pendulum():
     ax.set_yticks(np.arange(-10,10,2))
     ax.set_xlim([-4,4])
     ax.set_ylim([-10,10])
+    plt.tight_layout(h_pad=-0.5)
     ax.set_xlabel('$\\theta (rad)$')
     ax.set_ylabel('$\dot{\\theta} (rad/s)$')
     ax.set_title('Pendulum Swing-up Optimal Trajectory')
     # plt.show()
+    plt.gcf().subplots_adjust(left=0.13, bottom=0.12)
     plt.savefig('pendulum_bang_bang_path.png', dpi=500)
 if __name__ == '__main__':
     test_bang_bang_pendulum()
