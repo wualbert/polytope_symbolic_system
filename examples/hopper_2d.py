@@ -83,7 +83,7 @@ class Hopper_2d(DTHybridSystem):
         F_leg_descend = -self.k0*r_diff-self.b_leg*self.x[9]
         # F_leg_descend = F_leg_ascend
 
-        self.tau_p = 250.
+        self.tau_p = 400.
         self.tau_d = 10.
         hip_x_dot = self.x[5]+self.x[9]*sym.sin(self.x[2])+self.x[4]*sym.cos(self.x[2])*self.x[7]
         hip_y_dot = self.x[6]+self.x[9]*sym.cos(self.x[2])-self.x[4]*sym.sin(self.x[2])*self.x[7]
@@ -122,7 +122,7 @@ class Hopper_2d(DTHybridSystem):
         self.c_list = np.asarray([flight_ascend_conditions, flight_descend_conditions, contact_descend_coditions, contact_ascend_coditions])
 
         DTHybridSystem.__init__(self, self.f_list, self.f_type_list, self.x, self.u, self.c_list, \
-                                self.initial_env, input_limits=np.vstack([[-1e3,1e3], [1e3,5e3]]))
+                                self.initial_env, input_limits=np.vstack([[-400,0.8e3], [400,4e3]]))
 
     def get_cg_coordinate_states(self, env = None):
         """
@@ -190,149 +190,150 @@ class Hopper_2d(DTHybridSystem):
         env[self.xTD] = state[0]
         return env
 
-    def get_reachable_polytopes(self, state, step_size=1e-2, use_convex_hull=True):
-        polytopes_list = []
-        for mode, c_i in enumerate(self.c_list):
-            # FIXME: better way to check if the mode is possible
-            # Very naive check: if all-min and all-max input lead to not being in mode, assume state is not in mode
-            lower_bound_env = self.env.copy()
-            upper_bound_env = self.env.copy()
-            unactuated_env = self.env.copy()
-            for i, u_i in enumerate(self.u):
-                lower_bound_env[u_i] = self.input_limits[0,i]
-                upper_bound_env[u_i] = self.input_limits[1, i]
-                unactuated_env[u_i] = 0
-            for i, x_i in enumerate(self.x):
-                lower_bound_env[x_i] = state[i]
-                upper_bound_env[x_i] = state[i]
-                unactuated_env[x_i] = state[i]
-
-            if (not in_mode(c_i, lower_bound_env)) and (not in_mode(c_i, upper_bound_env)) and not in_mode(c_i, unactuated_env):
-                # print('dropping mode %i' %mode)
-                continue
-
-            current_linsys = self.get_linearization(state, mode=mode)
-            if current_linsys is None:
-                # this should not happen?
-                raise Exception
-            u_bar = (self.input_limits[1, :] + self.input_limits[0, :]) / 2
-            u_diff = (self.input_limits[1, :] - self.input_limits[0, :]) / 2
-            # print(mode)
-            #     print('A', current_linsys.A)
-            # print('B', current_linsys.B)
-            #     print('c', current_linsys.c)
-            # t = ((state[6]**2+2*self.g*abs(state[1]-self.ground_height_function(state[0])))**0.5-abs(state[6]))/self.g
-            # # print((0>=state[1]-self.ground_height_function(state[0])>=self.hover_step_size_switch_threshold),state[6])
-            #
-            # if (0>=state[1]-self.ground_height_function(state[0])>=self.hover_step_size_switch_threshold):# and abs(state[6])<0.7:
-            #     variable_step_size=min(max(self.contact_step_size, (0.65-state[4])/state[9]), self.flight_step_size)
-            #     # print(variable_step_size)
-            # elif (0<state[1] - self.ground_height_function(state[0]) < self.descend_step_size_switch_threshold and state[6] < 0) or\
-            #         (state[1]-self.ground_height_function(state[0])<=self.hover_step_size_switch_threshold):
-            #     #descending to ground
-            #     # if emerging from the ground, decrease step size further
-            #     # print((0.05-(state[1]-self.ground_height_function(state[0])))/state[6]))
-            #     # variable_step_size = max(min(self.contact_step_size, (0.05-(state[1]-self.ground_height_function(state[0])))/state[6]), 1e-3)f
-            #     variable_step_size = self.contact_step_size
-            #     # print('using contact step size')
-            # elif self.flight_step_size>1.2*t and state[6]<0 and (state[1]-self.ground_height_function(state[0])>0.):
-            #     # descending in flight
-            #     variable_step_size=max(self.contact_step_size, t)
-            #     # print('using adaptive flight step size', variable_step_size)
-            # else:
-            #     variable_step_size = self.flight_step_size
-
-            # override
-            variable_step_size = 1e-3
-            if self.dynamics_list[mode].type == 'continuous':
-                x = np.ndarray.flatten(
-                    np.dot(current_linsys.A * variable_step_size + np.eye(current_linsys.A.shape[0]), state)) + \
-                    np.dot(current_linsys.B * variable_step_size, u_bar) + np.ndarray.flatten(current_linsys.c * variable_step_size)
-                x = np.atleast_2d(x).reshape(-1, 1)
-                assert (len(x) == len(state))
-                G = np.atleast_2d(np.dot(current_linsys.B * variable_step_size, np.diag(u_diff)))
-            #
-            # elif self.dynamics_list[mode].type == 'discrete':
-            #     x = np.ndarray.flatten(
-            #         np.dot(current_linsys.A, state)) + \
-            #         np.dot(current_linsys.B, u_bar) + np.ndarray.flatten(current_linsys.c)
-            #     x = np.atleast_2d(x).reshape(-1, 1)
-            #     assert (len(x) == len(state))
-            #     G = np.atleast_2d(np.dot(current_linsys.B, np.diag(u_diff)))
-            #     # print('x', x)
-            #     # print('G', G)
-            else:
-                raise ValueError
-            # if mode==1:
-            #     print(G, x)
-            if use_convex_hull:
-                polytopes_list.append(convex_hull_of_point_and_polytope(x, zonotope(x,G)))
-            else:
-                polytopes_list.append(to_AH_polytope(zonotope(x, G)))
-        return np.asarray(polytopes_list)
-
-    def forward_step(self, u=None, linearlize=False, modify_system=True, step_size = 1e-3, return_as_env = False,
-                     return_mode = False, starting_state=None):
-        if starting_state is not None:
-            new_env = self._state_to_env(starting_state, u)
-        elif not modify_system:
-            new_env = self.env.copy()
-        else:
-            new_env = self.env
-        if u is not None:
-            for i in range(u.shape[0]):
-                new_env[self.u[i]] = min(max(u[i],self.input_limits[0,i]),self.input_limits[1,i])
-        else:
-            for i in range(self.u.shape[0]):
-                new_env[self.u[i]] = 0
-        # Check for which mode the system is in
-        delta_x = None
-        x_new = None
-        mode = -1
-        for i, c_i in enumerate(self.c_list):
-            is_in_mode = in_mode(c_i,new_env)
-            if not is_in_mode:
-                continue
-            if self.dynamics_list[i].type == 'continuous':
-                # use small step for contact
-                # if new_env[self.x[1]]<2e-1:
-                #     variable_step_size = 1e-3
-                # else:
-                #     variable_step_size = 1e-1
-                delta_x = self.dynamics_list[i].evaluate_xdot(new_env, linearlize)*step_size
-            # elif self.dynamics_list[i].type == 'discrete':
-            #     x_new = self.dynamics_list[i].evaluate_x_next(new_env, linearlize)
-            else:
-                raise ValueError
-            mode = i
-            break
-        # assert(mode != -1) # The system should always be in one mode
-        # print('mode', mode)
-        # print(self.env)
-        #FIXME: check if system is in 2 modes (illegal)
-
-        #assign new xs
-        if self.dynamics_list[mode].type=='continuous':
-            for i in range(delta_x.shape[0]):
-                new_env[self.x[i]] += delta_x[i]
-        # elif self.dynamics_list[mode].type=='discrete':
-        #     for i in range(x_new.shape[0]):
-        #         new_env[self.x[i]] = x_new[i]
-        else:
-            raise ValueError
-
-        # if new_env[self.x[4]] < self.r_min or new_env[self.x[4]]>self.r_max:
-        #     new_env[self.x[4]] = min(max(new_env[self.x[4]], self.r_min), self.r_max)
-        #     new_env[self.x[9]] = 0
-        self.do_internal_updates()
-
-        #return options
-        if return_as_env and not return_mode:
-            return new_env
-        elif return_as_env and return_mode:
-            return new_env, mode
-        elif not return_as_env and not return_mode:
-            return extract_variable_value_from_env(self.x, new_env)
-        else:
-            return extract_variable_value_from_env(self.x, new_env), mode
-
+    # def get_reachable_polytopes(self, state, step_size=1e-2, use_convex_hull=True):
+    #     polytopes_list = []
+    #     for mode, c_i in enumerate(self.c_list):
+    #         # FIXME: better way to check if the mode is possible
+    #         # Very naive check: if all-min and all-max input lead to not being in mode, assume state is not in mode
+    #         lower_bound_env = self.env.copy()
+    #         upper_bound_env = self.env.copy()
+    #         unactuated_env = self.env.copy()
+    #         for i, u_i in enumerate(self.u):
+    #             lower_bound_env[u_i] = self.input_limits[0,i]
+    #             upper_bound_env[u_i] = self.input_limits[1, i]
+    #             unactuated_env[u_i] = 0
+    #         for i, x_i in enumerate(self.x):
+    #             lower_bound_env[x_i] = state[i]
+    #             upper_bound_env[x_i] = state[i]
+    #             unactuated_env[x_i] = state[i]
+    #
+    #         if (not in_mode(c_i, lower_bound_env)) and (not in_mode(c_i, upper_bound_env)) and not in_mode(c_i, unactuated_env):
+    #             # print('dropping mode %i' %mode)
+    #             continue
+    #
+    #         current_linsys = self.get_linearization(state, mode=mode)
+    #         if current_linsys is None:
+    #             # this should not happen?
+    #             raise Exception
+    #         u_bar = (self.input_limits[1, :] + self.input_limits[0, :]) / 2
+    #         u_diff = (self.input_limits[1, :] - self.input_limits[0, :]) / 2
+    #         print('ubar, udiff', u_bar, u_diff)
+    #         # print(mode)
+    #         #     print('A', current_linsys.A)
+    #         # print('B', current_linsys.B)
+    #         #     print('c', current_linsys.c)
+    #         # t = ((state[6]**2+2*self.g*abs(state[1]-self.ground_height_function(state[0])))**0.5-abs(state[6]))/self.g
+    #         # # print((0>=state[1]-self.ground_height_function(state[0])>=self.hover_step_size_switch_threshold),state[6])
+    #         #
+    #         # if (0>=state[1]-self.ground_height_function(state[0])>=self.hover_step_size_switch_threshold):# and abs(state[6])<0.7:
+    #         #     variable_step_size=min(max(self.contact_step_size, (0.65-state[4])/state[9]), self.flight_step_size)
+    #         #     # print(variable_step_size)
+    #         # elif (0<state[1] - self.ground_height_function(state[0]) < self.descend_step_size_switch_threshold and state[6] < 0) or\
+    #         #         (state[1]-self.ground_height_function(state[0])<=self.hover_step_size_switch_threshold):
+    #         #     #descending to ground
+    #         #     # if emerging from the ground, decrease step size further
+    #         #     # print((0.05-(state[1]-self.ground_height_function(state[0])))/state[6]))
+    #         #     # variable_step_size = max(min(self.contact_step_size, (0.05-(state[1]-self.ground_height_function(state[0])))/state[6]), 1e-3)f
+    #         #     variable_step_size = self.contact_step_size
+    #         #     # print('using contact step size')
+    #         # elif self.flight_step_size>1.2*t and state[6]<0 and (state[1]-self.ground_height_function(state[0])>0.):
+    #         #     # descending in flight
+    #         #     variable_step_size=max(self.contact_step_size, t)
+    #         #     # print('using adaptive flight step size', variable_step_size)
+    #         # else:
+    #         #     variable_step_size = self.flight_step_size
+    #
+    #         # override
+    #         variable_step_size = 1e-3
+    #         if self.dynamics_list[mode].type == 'continuous':
+    #             x = np.ndarray.flatten(
+    #                 np.dot(current_linsys.A * variable_step_size + np.eye(current_linsys.A.shape[0]), state)) + \
+    #                 np.dot(current_linsys.B * variable_step_size, u_bar) + np.ndarray.flatten(current_linsys.c * variable_step_size)
+    #             x = np.atleast_2d(x).reshape(-1, 1)
+    #             assert (len(x) == len(state))
+    #             G = np.atleast_2d(np.dot(current_linsys.B * variable_step_size, np.diag(u_diff)))
+    #         #
+    #         # elif self.dynamics_list[mode].type == 'discrete':
+    #         #     x = np.ndarray.flatten(
+    #         #         np.dot(current_linsys.A, state)) + \
+    #         #         np.dot(current_linsys.B, u_bar) + np.ndarray.flatten(current_linsys.c)
+    #         #     x = np.atleast_2d(x).reshape(-1, 1)
+    #         #     assert (len(x) == len(state))
+    #         #     G = np.atleast_2d(np.dot(current_linsys.B, np.diag(u_diff)))
+    #         #     # print('x', x)
+    #         #     # print('G', G)
+    #         else:
+    #             raise ValueError
+    #         # if mode==1:
+    #         #     print(G, x)
+    #         if use_convex_hull:
+    #             polytopes_list.append(convex_hull_of_point_and_polytope(x, zonotope(x,G)))
+    #         else:
+    #             polytopes_list.append(to_AH_polytope(zonotope(x, G)))
+    #     return np.asarray(polytopes_list)
+    #
+    # def forward_step(self, u=None, linearlize=False, modify_system=True, step_size = 1e-3, return_as_env = False,
+    #                  return_mode = False, starting_state=None):
+    #     if starting_state is not None:
+    #         new_env = self._state_to_env(starting_state, u)
+    #     elif not modify_system:
+    #         new_env = self.env.copy()
+    #     else:
+    #         new_env = self.env
+    #     if u is not None:
+    #         for i in range(u.shape[0]):
+    #             new_env[self.u[i]] = min(max(u[i],self.input_limits[0,i]),self.input_limits[1,i])
+    #     else:
+    #         for i in range(self.u.shape[0]):
+    #             new_env[self.u[i]] = 0
+    #     # Check for which mode the system is in
+    #     delta_x = None
+    #     x_new = None
+    #     mode = -1
+    #     for i, c_i in enumerate(self.c_list):
+    #         is_in_mode = in_mode(c_i,new_env)
+    #         if not is_in_mode:
+    #             continue
+    #         if self.dynamics_list[i].type == 'continuous':
+    #             # use small step for contact
+    #             # if new_env[self.x[1]]<2e-1:
+    #             #     variable_step_size = 1e-3
+    #             # else:
+    #             #     variable_step_size = 1e-1
+    #             delta_x = self.dynamics_list[i].evaluate_xdot(new_env, linearlize)*step_size
+    #         # elif self.dynamics_list[i].type == 'discrete':
+    #         #     x_new = self.dynamics_list[i].evaluate_x_next(new_env, linearlize)
+    #         else:
+    #             raise ValueError
+    #         mode = i
+    #         break
+    #     # assert(mode != -1) # The system should always be in one mode
+    #     # print('mode', mode)
+    #     # print(self.env)
+    #     #FIXME: check if system is in 2 modes (illegal)
+    #
+    #     #assign new xs
+    #     if self.dynamics_list[mode].type=='continuous':
+    #         for i in range(delta_x.shape[0]):
+    #             new_env[self.x[i]] += delta_x[i]
+    #     # elif self.dynamics_list[mode].type=='discrete':
+    #     #     for i in range(x_new.shape[0]):
+    #     #         new_env[self.x[i]] = x_new[i]
+    #     else:
+    #         raise ValueError
+    #
+    #     # if new_env[self.x[4]] < self.r_min or new_env[self.x[4]]>self.r_max:
+    #     #     new_env[self.x[4]] = min(max(new_env[self.x[4]], self.r_min), self.r_max)
+    #     #     new_env[self.x[9]] = 0
+    #     self.do_internal_updates()
+    #
+    #     #return options
+    #     if return_as_env and not return_mode:
+    #         return new_env
+    #     elif return_as_env and return_mode:
+    #         return new_env, mode
+    #     elif not return_as_env and not return_mode:
+    #         return extract_variable_value_from_env(self.x, new_env)
+    #     else:
+    #         return extract_variable_value_from_env(self.x, new_env), mode
+    #

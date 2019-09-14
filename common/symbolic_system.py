@@ -260,7 +260,7 @@ class DTHybridSystem:
         else:
             for i in range(self.u.shape[0]):
                 #ensure u is scalar
-                new_env[self.u[i]] = np.ndarray.flatten(np.atleast_1d(self.u_bar[i]))[0]
+                new_env[self.u[i]] = np.ndarray.flatten(np.atleast_1d(self.u_bar))[i]
         # Check for which mode the system is in
         delta_x = None
         x_new = None
