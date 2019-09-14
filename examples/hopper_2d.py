@@ -221,26 +221,29 @@ class Hopper_2d(DTHybridSystem):
             #     print('A', current_linsys.A)
             # print('B', current_linsys.B)
             #     print('c', current_linsys.c)
-            t = ((state[6]**2+2*self.g*abs(state[1]-self.ground_height_function(state[0])))**0.5-abs(state[6]))/self.g
-            # print((0>=state[1]-self.ground_height_function(state[0])>=self.hover_step_size_switch_threshold),state[6])
+            # t = ((state[6]**2+2*self.g*abs(state[1]-self.ground_height_function(state[0])))**0.5-abs(state[6]))/self.g
+            # # print((0>=state[1]-self.ground_height_function(state[0])>=self.hover_step_size_switch_threshold),state[6])
+            #
+            # if (0>=state[1]-self.ground_height_function(state[0])>=self.hover_step_size_switch_threshold):# and abs(state[6])<0.7:
+            #     variable_step_size=min(max(self.contact_step_size, (0.65-state[4])/state[9]), self.flight_step_size)
+            #     # print(variable_step_size)
+            # elif (0<state[1] - self.ground_height_function(state[0]) < self.descend_step_size_switch_threshold and state[6] < 0) or\
+            #         (state[1]-self.ground_height_function(state[0])<=self.hover_step_size_switch_threshold):
+            #     #descending to ground
+            #     # if emerging from the ground, decrease step size further
+            #     # print((0.05-(state[1]-self.ground_height_function(state[0])))/state[6]))
+            #     # variable_step_size = max(min(self.contact_step_size, (0.05-(state[1]-self.ground_height_function(state[0])))/state[6]), 1e-3)
+            #     variable_step_size = self.contact_step_size
+            #     # print('using contact step size')
+            # elif self.flight_step_size>1.2*t and state[6]<0 and (state[1]-self.ground_height_function(state[0])>0.):
+            #     # descending in flight
+            #     variable_step_size=max(self.contact_step_size, t)
+            #     # print('using adaptive flight step size', variable_step_size)
+            # else:
+            #     variable_step_size = self.flight_step_size
 
-            if (0>=state[1]-self.ground_height_function(state[0])>=self.hover_step_size_switch_threshold):# and abs(state[6])<0.7:
-                variable_step_size=min(max(self.contact_step_size, (0.65-state[4])/state[9]), self.flight_step_size)
-                # print(variable_step_size)
-            elif (0<state[1] - self.ground_height_function(state[0]) < self.descend_step_size_switch_threshold and state[6] < 0) or\
-                    (state[1]-self.ground_height_function(state[0])<=self.hover_step_size_switch_threshold):
-                #descending to ground
-                # if emerging from the ground, decrease step size further
-                # print((0.05-(state[1]-self.ground_height_function(state[0])))/state[6]))
-                # variable_step_size = max(min(self.contact_step_size, (0.05-(state[1]-self.ground_height_function(state[0])))/state[6]), 1e-3)
-                variable_step_size = self.contact_step_size
-                # print('using contact step size')
-            elif self.flight_step_size>1.2*t and state[6]<0 and (state[1]-self.ground_height_function(state[0])>0.):
-                # descending in flight
-                variable_step_size=max(self.contact_step_size, t)
-                # print('using adaptive flight step size', variable_step_size)
-            else:
-                variable_step_size = self.flight_step_size
+            # override
+            variable_step_size = 1e-3
             if self.dynamics_list[mode].type == 'continuous':
                 x = np.ndarray.flatten(
                     np.dot(current_linsys.A * variable_step_size + np.eye(current_linsys.A.shape[0]), state)) + \
@@ -248,16 +251,16 @@ class Hopper_2d(DTHybridSystem):
                 x = np.atleast_2d(x).reshape(-1, 1)
                 assert (len(x) == len(state))
                 G = np.atleast_2d(np.dot(current_linsys.B * variable_step_size, np.diag(u_diff)))
-
-            elif self.dynamics_list[mode].type == 'discrete':
-                x = np.ndarray.flatten(
-                    np.dot(current_linsys.A, state)) + \
-                    np.dot(current_linsys.B, u_bar) + np.ndarray.flatten(current_linsys.c)
-                x = np.atleast_2d(x).reshape(-1, 1)
-                assert (len(x) == len(state))
-                G = np.atleast_2d(np.dot(current_linsys.B, np.diag(u_diff)))
-                # print('x', x)
-                # print('G', G)
+            #
+            # elif self.dynamics_list[mode].type == 'discrete':
+            #     x = np.ndarray.flatten(
+            #         np.dot(current_linsys.A, state)) + \
+            #         np.dot(current_linsys.B, u_bar) + np.ndarray.flatten(current_linsys.c)
+            #     x = np.atleast_2d(x).reshape(-1, 1)
+            #     assert (len(x) == len(state))
+            #     G = np.atleast_2d(np.dot(current_linsys.B, np.diag(u_diff)))
+            #     # print('x', x)
+            #     # print('G', G)
             else:
                 raise ValueError
             # if mode==1:
@@ -292,13 +295,13 @@ class Hopper_2d(DTHybridSystem):
                 continue
             if self.dynamics_list[i].type == 'continuous':
                 # use small step for contact
-                if new_env[self.x[1]]<2e-1:
-                    variable_step_size = 1e-2
-                else:
-                    variable_step_size = 1e-1
-                delta_x = self.dynamics_list[i].evaluate_xdot(new_env, linearlize)*variable_step_size
-            elif self.dynamics_list[i].type == 'discrete':
-                x_new = self.dynamics_list[i].evaluate_x_next(new_env, linearlize)
+                # if new_env[self.x[1]]<2e-1:
+                #     variable_step_size = 1e-3
+                # else:
+                #     variable_step_size = 1e-1
+                delta_x = self.dynamics_list[i].evaluate_xdot(new_env, linearlize)*step_size
+            # elif self.dynamics_list[i].type == 'discrete':
+            #     x_new = self.dynamics_list[i].evaluate_x_next(new_env, linearlize)
             else:
                 raise ValueError
             mode = i
@@ -312,9 +315,9 @@ class Hopper_2d(DTHybridSystem):
         if self.dynamics_list[mode].type=='continuous':
             for i in range(delta_x.shape[0]):
                 new_env[self.x[i]] += delta_x[i]
-        elif self.dynamics_list[mode].type=='discrete':
-            for i in range(x_new.shape[0]):
-                new_env[self.x[i]] = x_new[i]
+        # elif self.dynamics_list[mode].type=='discrete':
+        #     for i in range(x_new.shape[0]):
+        #         new_env[self.x[i]] = x_new[i]
         else:
             raise ValueError
 
