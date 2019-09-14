@@ -2,7 +2,7 @@ import pydrake.symbolic as sym
 from common.symbolic_system import *
 
 class Hopper_1d(DTHybridSystem):
-    def __init__(self, m=1, l=1, p=0.1, b=0.95, g=9.8, f_max=2, initial_state = None, epsilon = 1e-7):
+    def __init__(self, m=1, l=1, p=0.1, b=0.85, g=9.8, f_max=80, initial_state = None, epsilon = 1e-7):
         '''
         Vertical 1D hopper with actuated piston at the end of the leg.
         The hopper has 3 dynamics mode decided by the body height h:

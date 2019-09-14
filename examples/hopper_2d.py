@@ -178,7 +178,6 @@ class Hopper_2d(DTHybridSystem):
 
     def _state_to_env(self, state, u=None):
         env = {}
-        # print('state',state)
         for i, s_i in enumerate(state):
             env[self.x[i]] = s_i
         if u is None:
@@ -212,7 +211,7 @@ class Hopper_2d(DTHybridSystem):
                 # print('dropping mode %i' %mode)
                 continue
 
-            current_linsys = self.get_linearization(state, mode)
+            current_linsys = self.get_linearization(state, mode=mode)
             if current_linsys is None:
                 # this should not happen?
                 raise Exception
