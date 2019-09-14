@@ -19,8 +19,8 @@ class Hopper_2d(DTHybridSystem):
         self.l1 = l1
         self.l2 = l2
         self.k_g_y = k_g
-        self.k_g_x = 1e3
-        self.b_g_x = 20
+        self.k_g_x = 2e3
+        self.b_g_x = 200
         self.b_g = b_g
         self.g = g
         self.ground_height_function = ground_height_function
@@ -76,15 +76,15 @@ class Hopper_2d(DTHybridSystem):
         e1 = self.J_l*self.l2*sym.cos(self.x[2]-self.x[3])
         e2 = -self.J*R
         r_diff_upper = self.x[4]-(self.r0+2)
-        self.b_r_ascend = 0
+        self.b_r_ascend = 0.
         r_diff = self.x[4]-self.r0
         F_leg_flight = -self.k0_restore*r_diff-self.b0_restore*self.x[9]
-        F_leg_ascend = -4e3*r_diff - self.b_r_ascend * self.x[9]#self.u[1] * (1-np.exp(10*r_diff_upper)/(np.exp(10*r_diff_upper)+1))#+(- self.k0_stabilize * r_diff_upper - self.b0_stabilize * self.x[9])*(np.exp(10*r_diff_upper)/(np.exp(10*r_diff_upper)+1))
+        F_leg_ascend = -self.u[1]*r_diff - self.b_r_ascend * self.x[9]#self.u[1] * (1-np.exp(10*r_diff_upper)/(np.exp(10*r_diff_upper)+1))#+(- self.k0_stabilize * r_diff_upper - self.b0_stabilize * self.x[9])*(np.exp(10*r_diff_upper)/(np.exp(10*r_diff_upper)+1))
         F_leg_descend = -self.k0*r_diff-self.b_leg*self.x[9]
         # F_leg_descend = F_leg_ascend
 
-        self.tau_p = 250
-        self.tau_d = 10
+        self.tau_p = 250.
+        self.tau_d = 10.
         hip_x_dot = self.x[5]+self.x[9]*sym.sin(self.x[2])+self.x[4]*sym.cos(self.x[2])*self.x[7]
         hip_y_dot = self.x[6]+self.x[9]*sym.cos(self.x[2])-self.x[4]*sym.sin(self.x[2])*self.x[7]
         alpha_des_ascend = 0.6*sym.atan(hip_x_dot/(-hip_y_dot-1e-9))#-sym.atan(self.x[5]/self.x[6]) # point toward
@@ -122,7 +122,7 @@ class Hopper_2d(DTHybridSystem):
         self.c_list = np.asarray([flight_ascend_conditions, flight_descend_conditions, contact_descend_coditions, contact_ascend_coditions])
 
         DTHybridSystem.__init__(self, self.f_list, self.f_type_list, self.x, self.u, self.c_list, \
-                                self.initial_env, input_limits=np.vstack([[-50,40], [50,160]]))
+                                self.initial_env, input_limits=np.vstack([[-1e3,1e3], [1e3,5e3]]))
 
     def get_cg_coordinate_states(self, env = None):
         """
@@ -232,7 +232,7 @@ class Hopper_2d(DTHybridSystem):
             #     #descending to ground
             #     # if emerging from the ground, decrease step size further
             #     # print((0.05-(state[1]-self.ground_height_function(state[0])))/state[6]))
-            #     # variable_step_size = max(min(self.contact_step_size, (0.05-(state[1]-self.ground_height_function(state[0])))/state[6]), 1e-3)
+            #     # variable_step_size = max(min(self.contact_step_size, (0.05-(state[1]-self.ground_height_function(state[0])))/state[6]), 1e-3)f
             #     variable_step_size = self.contact_step_size
             #     # print('using contact step size')
             # elif self.flight_step_size>1.2*t and state[6]<0 and (state[1]-self.ground_height_function(state[0])>0.):
