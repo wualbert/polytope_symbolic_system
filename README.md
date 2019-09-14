@@ -1,1 +1,1 @@
-# polytope_symbolic_system
+# Polytope Symbolic System
