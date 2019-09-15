@@ -24,7 +24,7 @@ class Hopper_2d(DTHybridSystem):
         self.b_g = b_g
         self.g = g
         self.ground_height_function = ground_height_function
-        self.r0 = 4
+        self.r0 = 1.5
         # state machine for touchdown detection
         self.xTD = sym.Variable('xTD')
         self.was_in_contact = False
@@ -41,7 +41,7 @@ class Hopper_2d(DTHybridSystem):
         for i, state in enumerate(initial_state):
             self.initial_env[self.x[i]]=state
         self.initial_env[self.xTD] = 0
-        self.k0 = 500
+        self.k0 = 800
         self.b_leg = 2
         self.k0_stabilize = 40
         self.b0_stabilize = 10
@@ -75,7 +75,6 @@ class Hopper_2d(DTHybridSystem):
         d4 = -self.m*R*sym.cos(self.x[2])
         e1 = self.J_l*self.l2*sym.cos(self.x[2]-self.x[3])
         e2 = -self.J*R
-        r_diff_upper = self.x[4]-(self.r0+2)
         self.b_r_ascend = 0.
         r_diff = self.x[4]-self.r0
         F_leg_flight = -self.k0_restore*r_diff-self.b0_restore*self.x[9]
@@ -87,8 +86,8 @@ class Hopper_2d(DTHybridSystem):
         self.tau_d = 10.
         hip_x_dot = self.x[5]+self.x[9]*sym.sin(self.x[2])+self.x[4]*sym.cos(self.x[2])*self.x[7]
         hip_y_dot = self.x[6]+self.x[9]*sym.cos(self.x[2])-self.x[4]*sym.sin(self.x[2])*self.x[7]
-        alpha_des_ascend = 0.6*sym.atan(hip_x_dot/(-hip_y_dot-1e-9))#-sym.atan(self.x[5]/self.x[6]) # point toward
-        alpha_des_descend = 0.6*sym.atan(hip_x_dot/(hip_y_dot+1e-9)) # point toward landing point
+        alpha_des_ascend = 0.6*sym.atan(hip_x_dot/(-hip_y_dot-1e-6))#-sym.atan(self.x[5]/self.x[6]) # point toward
+        alpha_des_descend = 0.6*sym.atan(hip_x_dot/(hip_y_dot+1e-6)) # point toward landing point
         tau_leg_flight_ascend = (self.tau_p*(alpha_des_ascend-self.x[2])-self.tau_d*self.x[7])*-1
         tau_leg_flight_descend = (self.tau_p*(alpha_des_descend-self.x[2])-self.tau_d*self.x[7])*-1
         tau_leg_contact = self.u[0]
@@ -122,7 +121,7 @@ class Hopper_2d(DTHybridSystem):
         self.c_list = np.asarray([flight_ascend_conditions, flight_descend_conditions, contact_descend_coditions, contact_ascend_coditions])
 
         DTHybridSystem.__init__(self, self.f_list, self.f_type_list, self.x, self.u, self.c_list, \
-                                self.initial_env, input_limits=np.vstack([[-400,0.8e3], [400,4e3]]))
+                                self.initial_env, input_limits=np.vstack([[-500,1.4e3], [500,1e4]]))
 
     def get_cg_coordinate_states(self, env = None):
         """
