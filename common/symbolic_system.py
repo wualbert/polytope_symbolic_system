@@ -122,8 +122,8 @@ class DTContinuousSystem:
             self.input_limits = np.vstack([np.full(u.shape[0], -1e9),np.full(u.shape[0], 1e9)])
         else:
             self.input_limits = input_limits
-        self.u_bar = (self.input_limits[1,:]+self.input_limits[0,:])/2.
-        self.u_diff =(self.input_limits[1,:]-self.input_limits[0,:])/2.
+        self.u_bar = np.average(self.input_limits, axis=0)
+        self.u_diff = np.diff(self.input_limits, axis=0)/2.
         if initial_env is None:
             self.env = {}
             for x_i in self.dynamics.x:

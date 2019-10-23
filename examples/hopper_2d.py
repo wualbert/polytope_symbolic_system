@@ -3,7 +3,7 @@ import numpy as np
 from common.symbolic_system import *
 
 class Hopper_2d(DTHybridSystem):
-    def __init__(self, m=5, J=100, m_l=1, J_l=0.5, l1=0.0, l2=0.0, k_g=1e3, b_g=20, \
+    def __init__(self, m=5, J=500, m_l=1, J_l=0.5, l1=0.0, l2=0.0, k_g=2e3, b_g=20, \
                  g=9.8, flight_step_size = 1e-2, contact_step_size = 5e-3, descend_step_size_switch_threshold=2e-2, \
                  ground_height_function=lambda x: 0, initial_state=np.asarray([0.,0.,0.,1.5,1.0,0.,0.,0.,0.,0.])):
 
@@ -47,10 +47,10 @@ class Hopper_2d(DTHybridSystem):
         self.b0_stabilize = 10
         self.k0_restore = 60
         self.b0_restore = 15
-        self.flight_step_size = flight_step_size
-        self.contact_step_size = contact_step_size
-        self.descend_step_size_switch_threshold = descend_step_size_switch_threshold
-        self.hover_step_size_switch_threshold=-0.75
+        # self.flight_step_size = flight_step_size
+        # self.contact_step_size = contact_step_size
+        # self.descend_step_size_switch_threshold = descend_step_size_switch_threshold
+        # self.hover_step_size_switch_threshold=-0.75
         # print(self.initial_env)
 
         # Dynamic modes
@@ -121,7 +121,7 @@ class Hopper_2d(DTHybridSystem):
         self.c_list = np.asarray([flight_ascend_conditions, flight_descend_conditions, contact_descend_coditions, contact_ascend_coditions])
 
         DTHybridSystem.__init__(self, self.f_list, self.f_type_list, self.x, self.u, self.c_list, \
-                                self.initial_env, input_limits=np.vstack([[-500,1.4e3], [500,1e4]]))
+                                self.initial_env, input_limits=np.vstack([[-500,1.4e3], [500,2.5e3]]))
 
     def get_cg_coordinate_states(self, env = None):
         """
